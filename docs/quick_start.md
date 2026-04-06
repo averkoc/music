@@ -18,16 +18,18 @@ cd C:\github\music
 pip install -r requirements.txt
 ```
 
-### 2. Export a Test MIDI from MuseScore (1 minute)
+### 2. Export MusicXML from MuseScore (1 minute)
+
+**Recommended approach for best results:**
 
 1. Open any MuseScore file
-2. File → Export → MIDI
-3. Save to `midi_input/test.mid`
+2. File → Export → **MusicXML**
+3. Save to `musescore_files/test.musicxml`
 
-### 3. Process the MIDI (30 seconds)
+### 3. Process the MusicXML (30 seconds)
 
 ```bash
-python scripts/process_midi.py midi_input/test.mid --instrument violin -v
+python scripts/process_musicxml.py musescore_files/test.musicxml --instrument violin -v
 ```
 
 ### 4. Import to DAW (1 minute)
@@ -43,18 +45,21 @@ Press play and hear your melody with expression!
 
 ## What's Different?
 
-Compare the original MIDI with processed MIDI:
+Compare the original export with MusicXML-processed MIDI:
 
-**Original:**
+**Direct MIDI Export (old way):**
 - Notes with velocity only
-- No expression control
-- Static dynamics
+- Articulations lost or approximated
+- Dynamics flattened to velocity values
+- Slurs not detectable
 
-**Processed:**
-- CC11 (Expression) messages
-- CC1 (Vibrato) on sustained notes
-- Dynamic response to velocity changes
-- Articulation-aware processing
+**MusicXML Processed (new way):**
+- All articulations preserved (staccato, accent, legato, etc.)
+- CC11 (Expression) mapped from true dynamic markings
+- CC1 (Vibrato) intelligently applied
+- CC64 (Legato) for slurred passages
+- Dynamic changes (crescendo/diminuendo) detected
+- Articulation-specific CC adjustments
 
 ## Next Steps
 

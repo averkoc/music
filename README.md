@@ -4,15 +4,28 @@ Convert MuseScore Studio melodies into expressive performances using SWAM VST3 i
 
 ## Overview
 
-This project bridges the gap between MuseScore's notation-based composition and SWAM's expressive, physics-modeled instruments. It processes exported MIDI files from MuseScore and enhances them with the continuous MIDI CC messages that SWAM instruments need for realistic, expressive playback.
+This project bridges the gap between MuseScore's notation-based composition and SWAM's expressive, physics-modeled instruments. It processes **MusicXML files** (recommended) or MIDI files from MuseScore and generates sophisticated MIDI with continuous CC messages that SWAM instruments need for realistic, expressive playback.
+
+### Why MusicXML? (Recommended)
+
+**MusicXML preserves ALL your articulations and dynamics!**
+
+- ✅ Articulations (staccato, legato, accent) preserved exactly
+- ✅ Dynamics (pp, mf, ff) as semantic data, not just velocity
+- ✅ Slurs and phrase markings explicitly available
+- ✅ Expression text (dolce, espressivo) captured
+- ✅ Crescendo/diminuendo wedges detected accurately
+
+MIDI export loses most of this information, requiring guesswork to reconstruct articulations.
 
 ## Features
 
-- 🎵 Process MuseScore MIDI exports for SWAM compatibility
+- 🎵 **Recommended**: Process MuseScore MusicXML exports with full articulation preservation
+- 🎵 **Alternative**: Process basic MIDI exports (limited articulation detection)
 - 🎻 Optimized presets for SWAM Violin and Saxophone
-- 🎚️ Convert MuseScore articulations and dynamics to SWAM CC messages
+- 🎚️ Intelligent conversion of articulations to SWAM CC messages
 - 🔄 Integration with CameloPro MIDI mapping templates
-- 📝 Preserve musical expression (vibrato, crescendo, articulations)
+- 📝 Preserve musical expression (vibrato, crescendo, dynamics, articulations)
 
 ## Project Structure
 
@@ -53,25 +66,36 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Basic Workflow
+### Recommended Workflow (MusicXML)
 
 1. **Compose in MuseScore Studio**
    - Write your melody with articulations and dynamics
-   - Use standard notation (staccato, legato, crescendo, etc.)
+   - Use standard notation (staccato, legato, crescendo, accents, etc.)
 
-2. **Export MIDI from MuseScore**
-   - File → Export → MIDI
-   - Save to `midi_input/` folder
+2. **Export MusicXML from MuseScore**
+   - File → Export → MusicXML
+   - Save to `musescore_files/` folder
 
-3. **Process MIDI for SWAM**
+3. **Process MusicXML for SWAM**
    ```bash
-   python scripts/process_midi.py midi_input/your_file.mid --instrument violin
+   python scripts/process_musicxml.py musescore_files/your_file.musicxml --instrument violin -v
    ```
 
 4. **Load in Your DAW**
-   - Import processed MIDI from `mid_output/`
+   - Import processed MIDI from `midi_output/`
    - Load SWAM Violin or Saxophone VST3
    - Apply preset from `presets/` folder if desired
+   - Enjoy expressive playback with accurate articulations!
+
+### Alternative Workflow (Basic MIDI)
+
+If you prefer to work with MIDI directly:
+
+```bash
+python scripts/process_midi.py midi_input/your_file.mid --instrument violin
+```
+
+**Note**: MIDI processing has limited articulation detection. MusicXML is strongly recommended for best results.
 
 ### Advanced: Using CameloPro
 

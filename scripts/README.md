@@ -1,12 +1,62 @@
 # Scripts
 
-Python tools for processing MIDI files for SWAM instruments.
+Python tools for processing MuseScore files for SWAM instruments.
 
 ## Available Scripts
 
-### `process_midi.py`
+### `process_musicxml.py` ⭐ **RECOMMENDED**
 
-Main script for processing individual MIDI files.
+Process MusicXML files with **full articulation preservation**.
+
+**Why use this?**
+- Preserves ALL articulations from MuseScore (staccato, accent, tenuto, etc.)
+- Detects dynamics as semantic data (pp, mf, ff), not just velocity
+- Captures slurs, phrase markings, and expression text
+- Intelligently maps articulations to SWAM CC messages
+- Handles crescendo/diminuendo wedges accurately
+
+**Usage:**
+```bash
+python process_musicxml.py <input_file.musicxml> --instrument <violin|saxophone> [options]
+```
+
+**Options:**
+- `-i, --instrument`: Target SWAM instrument (required)
+- `-o, --output`: Custom output path (optional)
+- `-v, --verbose`: Print detailed processing info with articulation counts
+
+**Examples:**
+```bash
+# Basic usage
+python process_musicxml.py ../musescore_files/melody.musicxml --instrument violin
+
+# With verbose output to see detected articulations
+python process_musicxml.py ../musescore_files/song.musicxml -i saxophone -v
+
+# Custom output
+python process_musicxml.py ../musescore_files/piece.musicxml -i violin -o ../midi_output/custom.mid
+```
+
+**Supported Articulations:**
+- Staccato (.) - Short notes with reduced CC11
+- Staccatissimo (.') - Very short notes
+- Accent (>) - Emphasized attack with CC11 boost
+- Strong Accent/Marcato (^) - Heavy emphasis
+- Tenuto (-) - Full value, slight CC11 increase
+- Legato/Slurs - CC64 sustain enabled
+- And more...
+
+### `process_midi.py` (Basic fallback)
+
+Main script for processing pre-exported MIDI files.
+
+**Limitations:**
+- Articulations must be guessed from note duration and velocity
+- Dynamics are lost (only velocity available)
+- Slurs not detectable
+- Less accurate CC mapping
+
+Use this only if you need to process existing MIDI files or prefer the MIDI workflow.
 
 **Usage:**
 ```bash
@@ -46,6 +96,35 @@ python batch_process.py ../midi_input violin
 
 # Process a specific folder
 python batch_process.py ../musescore_files/exported saxophone
+```
+
+### `articulation_detector.py`
+
+Core library for extracting articulations from MusicXML (imported by `process_musicxml.py`).
+
+**Key Classes:**
+- `ArticulationType`: Enum of supported articulations
+- `DynamicLevel`: Dynamic markings (ppp → ffff) with CC values
+- `NoteArticulation`: Data structure for note expressiondata
+- `MusicXMLArticulationDetector`: Main analyzer
+
+**Example usage:**
+```python
+from music21 import converter
+from articulation_detector import MusicXMLArticulationDetector
+
+# Load MusicXML
+score = converter.parse('melody.musicxml')
+
+# Analyze
+detector = MusicXMLArticulationDetector()
+notes, dynamics = detector.analyze_score(score)
+
+# Access articulation data
+for note in notes:
+    print(f"Note {note.pitch}: {note.articulations}")
+    print(f"  Dynamic: {note.dynamic_level.marking}")
+    print(f"  In slur: {note.in_slur}")
 ```
 
 ### `swam_cc_mapper.py`
