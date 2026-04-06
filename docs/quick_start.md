@@ -67,7 +67,7 @@ Once you have the basics working:
 
 1. **Read the full workflow guide**: `docs/workflow_guide.md`
 2. **Experiment with settings**: Edit `config/swam_config.json`
-3. **Try CameloPro**: See `config/camelopro/README.md` for real-time processing
+3. **Try Camelot**: See `config/camelot/README.md` for real-time processing with native SWAM integration
 4. **Create presets**: Save your SWAM settings in `presets/`
 
 ## Common First-Time Issues

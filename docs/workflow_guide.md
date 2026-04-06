@@ -29,7 +29,7 @@ Complete guide for converting MuseScore compositions into expressive SWAM instru
          ▼
 ┌─────────────────┐
 │  Python Script  │  Add SWAM-specific CC messages
-│  or CameloPro   │  (expression, breath, vibrato)
+│  or Camelot     │  (expression, breath, vibrato)
 └────────┬────────┘
          │
          ▼
@@ -139,9 +139,9 @@ python scripts/process_midi.py midi_input/melody.mid --instrument saxophone --ou
 python scripts/process_midi.py midi_input/melody.mid --instrument violin -v
 ```
 
-### Method 2: CameloPro
+### Method 2: Camelot (Native SWAM Integration)
 
-See `config/camelopro/README.md` for real-time routing setup.
+See `config/camelot/README.md` for real-time routing setup. Camelot is made by Audio Modeling (same company as SWAM) and includes native presets.
 
 ### What the Processing Does
 

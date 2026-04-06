@@ -24,7 +24,7 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 - 🎵 **Alternative**: Process basic MIDI exports (limited articulation detection)
 - 🎻 Optimized presets for SWAM Violin and Saxophone
 - 🎚️ Intelligent conversion of articulations to SWAM CC messages
-- 🔄 Integration with CameloPro MIDI mapping templates
+- 🔄 Integration with Camelot (by Audio Modeling) with native SWAM presets
 - 📝 Preserve musical expression (vibrato, crescendo, dynamics, articulations)
 
 ## Project Structure
@@ -46,7 +46,7 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 - Python 3.8 or higher
 - MuseScore Studio (for composition)
 - SWAM Violin and/or Saxophone VST3 plugins
-- CameloPro (optional, for advanced MIDI routing)
+- Camelot (optional, for real-time MIDI processing with native SWAM integration)
 - A DAW that supports VST3 (Reaper, Cubase, etc.)
 
 ### Installation
@@ -97,13 +97,14 @@ python scripts/process_midi.py midi_input/your_file.mid --instrument violin
 
 **Note**: MIDI processing has limited articulation detection. MusicXML is strongly recommended for best results.
 
-### Advanced: Using CameloPro
+### Advanced: Using Camelot (Native SWAM Integration)
 
-CameloPro provides pre-configured MIDI CC mappings optimized for SWAM instruments:
+Camelot is made by Audio Modeling (same company as SWAM) and provides native presets optimized for SWAM instruments:
 
-1. Import CameloPro preset from `config/camelopro/`
-2. Route MuseScore MIDI through CameloPro
-3. CameloPro will add appropriate CC messages automatically
+1. See setup instructions in `config/camelot/README.md`
+2. Route MuseScore MIDI through Camelot
+3. Select the matching SWAM preset (Violin, Saxophone, etc.)
+4. Camelot will add appropriate CC messages automatically using Audio Modeling's optimized curves
 
 ## SWAM MIDI CC Mappings
 

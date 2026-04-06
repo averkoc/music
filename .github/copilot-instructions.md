@@ -5,7 +5,7 @@ This project converts MuseScore Studio melodies into MIDI with proper articulati
 ## Project Context
 - **Primary Language**: Python
 - **Main Purpose**: MIDI processing for expressive virtual instruments
-- **Key Technologies**: mido library for MIDI manipulation, CameloPro for SWAM CC mappings
+- **Key Technologies**: mido library for MIDI manipulation, Camelot (by Audio Modeling) for SWAM CC mappings
 
 ## Coding Guidelines
 - Use Python type hints for all function signatures
@@ -18,4 +18,4 @@ This project converts MuseScore Studio melodies into MIDI with proper articulati
 - SWAM instruments are highly expressive and respond to continuous MIDI CC messages
 - Key CCs: CC1 (modulation/vibrato), CC2 (breath), CC11 (expression), CC74 (brightness)
 - Articulations may need specific CC combinations for realistic performance
-- CameloPro provides pre-configured MIDI mappings for MuseScore → SWAM workflow
+- Camelot (by Audio Modeling) provides pre-configured MIDI mappings for MuseScore → SWAM workflow with native SWAM integration
