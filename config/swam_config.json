@@ -52,23 +52,67 @@
         }
       },
       "articulations": {
+        "crescendo": {
+          "cc": 11,
+          "ramp_type": "exponential",
+          "steps": 15,
+          "description": "Gradual increase in volume",
+          "notes": "Exponential ramp sounds more natural than linear"
+        },
+        "diminuendo": {
+          "cc": 11,
+          "ramp_type": "exponential",
+          "steps": 15,
+          "description": "Gradual decrease in volume"
+        },
         "staccato": {
-          "note_duration": "25%",
-          "cc11_adjustment": -20,
-          "description": "Short, detached notes"
+          "note_duration_percent": 50,
+          "cc11_spike": 105,
+          "cc11_base_offset": 0,
+          "description": "Short, detached notes with accent",
+          "notes": "Spike CC11 then drop immediately; 50-60% duration is typical"
         },
         "legato": {
           "cc64": 127,
+          "cc68": 127,
           "note_overlap": true,
-          "description": "Smooth, connected notes"
+          "overlap_percent": 10,
+          "description": "Smooth, connected notes",
+          "notes": "CC64=sustain, CC68=legato switch (if supported)"
+        },
+        "slur": {
+          "cc5_portamento": 40,
+          "cc64": 127,
+          "note_overlap": true,
+          "overlap_percent": 15,
+          "description": "Legato with slide between notes",
+          "notes": "Higher overlap and portamento for smooth glide"
+        },
+        "vibrato_mark": {
+          "cc1_target": 64,
+          "delay_ms": 500,
+          "ramp_duration_ms": 300,
+          "description": "Gradually add vibrato after note onset",
+          "notes": "Delay makes it sound natural; adjust target for intensity"
         },
         "accent": {
           "cc11_peak": 110,
           "velocity_boost": 20,
           "description": "Emphasized note attack"
         },
+        "sul_ponticello": {
+          "cc9_value": 115,
+          "cc9_range": [110, 127],
+          "description": "Bow position near bridge (bright, metallic)",
+          "notes": "CC9 controls bow position; higher = closer to bridge"
+        },
+        "sul_tasto": {
+          "cc9_value": 15,
+          "cc9_range": [0, 20],
+          "description": "Bow position over fingerboard (soft, dark)"
+        },
         "spiccato": {
-          "note_duration": "40%",
+          "note_duration_percent": 40,
           "cc74": 80,
           "description": "Bouncing bow stroke"
         }
@@ -128,27 +172,62 @@
         }
       },
       "articulations": {
+        "crescendo": {
+          "cc": 11,
+          "ramp_type": "exponential",
+          "steps": 15,
+          "description": "Gradual increase in volume"
+        },
+        "diminuendo": {
+          "cc": 11,
+          "ramp_type": "exponential",
+          "steps": 15,
+          "description": "Gradual decrease in volume"
+        },
         "staccato": {
-          "note_duration": "30%",
-          "cc2_reduction": -15,
-          "description": "Short, tongued notes"
+          "note_duration_percent": 55,
+          "cc2_spike": 100,
+          "cc11_spike": 100,
+          "description": "Short, tongued notes",
+          "notes": "Breath spike for attack; slightly longer than violin staccato"
         },
         "legato": {
           "cc64": 127,
           "note_overlap": true,
+          "overlap_percent": 10,
           "cc2_constant": 80,
           "description": "Smooth air flow between notes"
+        },
+        "slur": {
+          "cc5_portamento": 30,
+          "cc64": 127,
+          "note_overlap": true,
+          "overlap_percent": 15,
+          "cc2_constant": 85,
+          "description": "Legato with pitch bend between notes"
+        },
+        "vibrato_mark": {
+          "cc1_target": 64,
+          "delay_ms": 500,
+          "ramp_duration_ms": 300,
+          "description": "Gradually add vibrato after note onset"
         },
         "accent": {
           "cc2_peak": 110,
           "cc11_peak": 105,
-          "description": "Tongued emphasis"
+          "description": "Tongued emphasis with breath"
         },
         "slap_tongue": {
           "velocity": 127,
           "cc2_spike": 127,
-          "note_duration": "20%",
+          "note_duration_percent": 20,
           "description": "Percussive slap effect"
+        },
+        "growl": {
+          "cc18_value": 80,
+          "cc18_range": [40, 100],
+          "description": "Jazz growl effect",
+          "notes": "CC18 adds harmonic distortion; use sparingly"
         }
       },
       "dynamics": {

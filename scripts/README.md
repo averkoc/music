@@ -4,6 +4,87 @@ Python tools for processing MuseScore files for SWAM instruments.
 
 ## Available Scripts
 
+### `articulation_mapper.py` ⭐ **NEW**
+
+**Configurable articulation system** that maps musical expressions to SWAM CC messages.
+
+**Features:**
+- Load articulation settings from `config/swam_config.json`
+- Customize behavior per instrument (violin, saxophone)
+- Support for advanced articulations:
+  - **Crescendo/Diminuendo** - Exponential or linear CC11 ramps
+  - **Vibrato Mark** - Delayed vibrato with gradual onset (CC1)
+  - **Staccato** - CC11 spike-and-drop with configurable duration
+  - **Slur/Legato** - Note overlap + portamento (CC5) + sustain (CC64)
+  - **Sul Ponticello/Tasto** - Bow position control (CC9) for strings
+  - **Accent** - Brief CC11 spike without shortening notes
+  - **Growl** - Jazz effect for saxophone (CC18)
+
+**Configuration Example:**
+```json
+{
+  "staccato": {
+    "note_duration_percent": 50,
+    "cc11_spike": 105,
+    "description": "Short, detached notes"
+  },
+  "vibrato_mark": {
+    "cc1_target": 64,
+    "delay_ms": 500,
+    "ramp_duration_ms": 300,
+    "description": "Natural delayed vibrato"
+  }
+}
+```
+
+**Usage:**
+```python
+from articulation_mapper import ArticulationMapper
+from swam_cc_mapper import SWAMInstrument
+from articulation_detector import ArticulationType
+
+mapper = ArticulationMapper(SWAMInstrument.VIOLIN)
+messages = mapper.apply_articulation(
+    ArticulationType.STACCATO,
+    base_cc11=80,
+    note_duration_ticks=480,
+    tempo_bpm=120
+)
+```
+
+See `example_articulations.py` for complete examples.
+
+### `swam_cc_mapper.py`
+
+SWAM CC message generator with new methods:
+- `apply_staccato()` - Spike CC11 then drop to 0
+- `apply_vibrato_delayed()` - Gradual vibrato onset after delay
+- `apply_sul_ponticello()` / `apply_sul_tasto()` - Bow position (CC9)
+- `apply_portamento()` - Pitch slide effect (CC5)
+- `create_exponential_crescendo()` - More natural dynamic curves
+- `apply_growl()` - Saxophone growl effect (CC18)
+
+### `articulation_detector.py`
+
+Extracts articulations from MusicXML with support for:
+- Standard articulations (staccato, accent, tenuto, etc.)
+- Expression marks (crescendo, diminuendo, vibrato)
+- Playing techniques (sul ponticello, sul tasto)
+- Dynamic markings and wedges
+
+### `example_articulations.py`
+
+Interactive examples showing:
+1. How to apply each articulation type
+2. Resulting CC messages with timing
+3. How to customize configuration
+4. Note duration modifications
+
+Run with:
+```bash
+python example_articulations.py
+```
+
 ### `process_musicxml.py` ⭐ **RECOMMENDED**
 
 Process MusicXML files with **full articulation preservation**.

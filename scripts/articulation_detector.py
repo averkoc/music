@@ -22,6 +22,12 @@ class ArticulationType(Enum):
     SLUR = "slur"
     SPICCATO = "spiccato"
     DETACHE = "detache"
+    CRESCENDO = "crescendo"
+    DIMINUENDO = "diminuendo"
+    VIBRATO = "vibrato"
+    SUL_PONTICELLO = "sul-ponticello"
+    SUL_TASTO = "sul-tasto"
+    PORTAMENTO = "portamento"
 
 
 class DynamicLevel(Enum):
