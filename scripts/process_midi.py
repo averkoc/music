@@ -63,6 +63,14 @@ def process_midi_file(
                 if msg.type == 'track_name' and verbose:
                     print(f"  Track {i}: {msg.name}")
         
+        # Add initialization messages to wake up SWAM instrument
+        # SWAM needs expression movement stimulus to activate
+        init_messages = mapper.create_initialization_messages(time=0)
+        new_track.extend(init_messages)
+        
+        if verbose and i == 0:  # Only print once
+            print("  Added SWAM initialization stimulus (CC11 movement)")
+        
         # Process notes and add CC messages
         current_velocity = 64
         current_time = 0

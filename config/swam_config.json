@@ -1,4 +1,9 @@
 {
+  "_notes": [
+    "SWAM instruments require initialization stimulus to activate physical modeling",
+    "Send CC11 (expression) movement at track start to 'wake up' the instrument",
+    "Without initial stimulus, SWAM may not produce sound on first notes"
+  ],
   "instruments": {
     "violin": {
       "name": "SWAM Violin",

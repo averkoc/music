@@ -207,6 +207,20 @@ CC74 (Brightness)
 
 ## SWAM Configuration
 
+### Important: SWAM Initialization
+
+**SWAM instruments require stimulus to activate their physical modeling engine.**
+
+When processing MIDI files with the Python scripts, initialization messages are automatically added at the start of each track. These messages create brief expression (CC11) movement to "wake up" the instrument.
+
+**Why this matters:**
+- SWAM instruments use physical modeling synthesis
+- They need volume/expression movement to begin generating sound
+- Without initialization, the first few notes may be silent or delayed
+
+**Automatic handling:**
+The `process_midi.py` script automatically adds CC11 initialization at track start, so no manual intervention is needed.
+
 ### Loading Presets
 
 1. Open SWAM plugin interface

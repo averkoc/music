@@ -201,6 +201,42 @@ class SWAMCCMapper:
         
         return messages
     
+    def create_initialization_messages(self, time: int = 0) -> List[mido.Message]:
+        """
+        Create initialization messages to "wake up" SWAM instrument.
+        
+        SWAM instruments need stimulus (expression movement) to activate
+        their physical modeling engine. This sends a brief ramp-up and
+        ramp-down of expression to ensure the instrument is responsive.
+        
+        Args:
+            time: Starting delta time for messages
+            
+        Returns:
+            List of MIDI control change messages for initialization
+        """
+        messages = []
+        
+        # Brief expression ramp to wake up the instrument
+        # Start at 0, ramp to 40, then back to default
+        init_sequence = [
+            (time, 0),           # Start silent
+            (10, 40),            # Quick rise
+            (10, 20),            # Slight fall
+            (10, 60),            # Rise to working level
+        ]
+        
+        for delta_time, value in init_sequence:
+            messages.append(mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=self.CC_EXPRESSION,
+                value=value,
+                time=delta_time
+            ))
+        
+        return messages
+    
     def _velocity_to_cc(self, velocity: int) -> int:
         """
         Convert MIDI velocity to CC value with appropriate curve.
