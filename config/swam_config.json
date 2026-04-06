@@ -1,0 +1,167 @@
+{
+  "instruments": {
+    "violin": {
+      "name": "SWAM Violin",
+      "midi_channel": 0,
+      "cc_mappings": {
+        "expression": {
+          "cc": 11,
+          "description": "Overall expression/dynamics",
+          "range": [20, 127],
+          "default": 80
+        },
+        "modulation": {
+          "cc": 1,
+          "description": "Vibrato depth and speed",
+          "range": [0, 127],
+          "default": 0,
+          "notes": "0 = no vibrato, 64 = moderate, 127 = intense"
+        },
+        "brightness": {
+          "cc": 74,
+          "description": "Tone brightness/timbre",
+          "range": [0, 127],
+          "default": 64
+        },
+        "sustain": {
+          "cc": 64,
+          "description": "Legato/sustain pedal",
+          "range": [0, 127],
+          "values": {
+            "off": 0,
+            "on": 127
+          },
+          "notes": "Use for legato passages"
+        },
+        "portamento_time": {
+          "cc": 5,
+          "description": "Slide time between notes",
+          "range": [0, 127],
+          "default": 0
+        },
+        "reverb": {
+          "cc": 91,
+          "description": "Reverb send level",
+          "range": [0, 127],
+          "default": 40
+        }
+      },
+      "articulations": {
+        "staccato": {
+          "note_duration": "25%",
+          "cc11_adjustment": -20,
+          "description": "Short, detached notes"
+        },
+        "legato": {
+          "cc64": 127,
+          "note_overlap": true,
+          "description": "Smooth, connected notes"
+        },
+        "accent": {
+          "cc11_peak": 110,
+          "velocity_boost": 20,
+          "description": "Emphasized note attack"
+        },
+        "spiccato": {
+          "note_duration": "40%",
+          "cc74": 80,
+          "description": "Bouncing bow stroke"
+        }
+      },
+      "dynamics": {
+        "ppp": 20,
+        "pp": 35,
+        "p": 50,
+        "mp": 65,
+        "mf": 80,
+        "f": 95,
+        "ff": 110,
+        "fff": 127
+      }
+    },
+    "saxophone": {
+      "name": "SWAM Saxophone",
+      "midi_channel": 0,
+      "cc_mappings": {
+        "expression": {
+          "cc": 11,
+          "description": "Overall expression/dynamics",
+          "range": [20, 127],
+          "default": 80
+        },
+        "breath": {
+          "cc": 2,
+          "description": "Breath pressure",
+          "range": [0, 127],
+          "default": 64,
+          "notes": "Essential for saxophone - controls air flow and tone"
+        },
+        "modulation": {
+          "cc": 1,
+          "description": "Vibrato depth",
+          "range": [0, 127],
+          "default": 0
+        },
+        "brightness": {
+          "cc": 74,
+          "description": "Tone brightness",
+          "range": [0, 127],
+          "default": 64
+        },
+        "sustain": {
+          "cc": 64,
+          "description": "Legato/sustain",
+          "range": [0, 127],
+          "default": 0
+        },
+        "growl": {
+          "cc": 18,
+          "description": "Growl amount (jazz effect)",
+          "range": [0, 127],
+          "default": 0,
+          "notes": "Increases harmonic distortion for jazz styles"
+        }
+      },
+      "articulations": {
+        "staccato": {
+          "note_duration": "30%",
+          "cc2_reduction": -15,
+          "description": "Short, tongued notes"
+        },
+        "legato": {
+          "cc64": 127,
+          "note_overlap": true,
+          "cc2_constant": 80,
+          "description": "Smooth air flow between notes"
+        },
+        "accent": {
+          "cc2_peak": 110,
+          "cc11_peak": 105,
+          "description": "Tongued emphasis"
+        },
+        "slap_tongue": {
+          "velocity": 127,
+          "cc2_spike": 127,
+          "note_duration": "20%",
+          "description": "Percussive slap effect"
+        }
+      },
+      "dynamics": {
+        "ppp": 25,
+        "pp": 40,
+        "p": 55,
+        "mp": 70,
+        "mf": 85,
+        "f": 100,
+        "ff": 115,
+        "fff": 127
+      }
+    }
+  },
+  "global_settings": {
+    "ticks_per_beat": 480,
+    "default_tempo": 120,
+    "cc_interpolation": true,
+    "notes": "CC interpolation smooths transitions between CC values"
+  }
+}

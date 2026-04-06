@@ -1,0 +1,32 @@
+﻿# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text eol=lf
+
+# MIDI files are binary
+*.mid binary
+*.midi binary
+
+# MuseScore files are binary
+*.mscz binary
+*.mscx text eol=lf
+
+# Configuration files
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# VST preset files
+*.ssvp binary
+*.sssp binary
