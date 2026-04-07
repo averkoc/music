@@ -91,11 +91,40 @@
           "notes": "Higher overlap and portamento for smooth glide"
         },
         "vibrato_mark": {
-          "cc1_target": 64,
-          "delay_ms": 500,
-          "ramp_duration_ms": 300,
-          "description": "Gradually add vibrato after note onset",
-          "notes": "Delay makes it sound natural; adjust target for intensity"
+          "cc1_target": 45,
+          "cc17_target": 67,
+          "delay_ms": 200,
+          "ramp_duration_ms": 150,
+          "pitch_dependent": {
+            "enabled": true,
+            "low_notes": {
+              "threshold": "D4",
+              "cc1_depth": 50,
+              "cc17_rate": 60,
+              "description": "Wider, slower vibrato on G/D strings"
+            },
+            "high_notes": {
+              "threshold": "D5",
+              "cc1_depth": 40,
+              "cc17_rate": 75,
+              "description": "Narrower, faster vibrato on A/E strings"
+            },
+            "mid_notes": {
+              "cc1_depth": 45,
+              "cc17_rate": 67,
+              "description": "Balanced vibrato for middle register"
+            }
+          },
+          "jitter": {
+            "enabled": true,
+            "cc1_range": 5,
+            "cc17_range": 3,
+            "interval_ms": 50,
+            "description": "Add human-like variation during sustain"
+          },
+          "min_duration_seconds": 0.5,
+          "description": "Natural vibrato with pitch-dependent depth/rate and continuous jitter",
+          "notes": "CC1=depth (30-55), CC17=rate (60-75). Short notes skip vibrato. Jitter breaks synthetic pattern."
         },
         "accent": {
           "cc11_peak": 110,

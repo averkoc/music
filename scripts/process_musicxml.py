@@ -233,6 +233,25 @@ class MusicXMLToSWAM:
             # Calculate note off time
             duration_ticks = int(note_art.duration * self.ticks_per_beat)
             has_glissando = ArticulationType.GLISSANDO in note_art.articulations
+            has_vibrato = ArticulationType.VIBRATO in note_art.articulations
+            
+            # Add vibrato jitter during note sustain if vibrato is marked
+            if has_vibrato and hasattr(note_art, '_vibrato_targets'):
+                # Calculate how much time was used for vibrato ramp
+                vibrato_config = note_art._vibrato_targets[2]
+                tempo_bpm = 120
+                ms_per_beat = 60000 / tempo_bpm
+                delay_ms = vibrato_config.get('delay_ms', 300)
+                ramp_ms = vibrato_config.get('ramp_duration_ms', 200)
+                elapsed_ticks = int(((delay_ms + ramp_ms) / ms_per_beat) * self.ticks_per_beat)
+                
+                # Generate jitter messages
+                jitter_messages = self._generate_vibrato_jitter(
+                    note_art,
+                    duration_ticks,
+                    elapsed_ticks
+                )
+                track.extend(jitter_messages)
             
             # Adjust duration for articulations
             if has_glissando:
@@ -336,37 +355,99 @@ class MusicXMLToSWAM:
         
         # Check for vibrato articulation mark - use delayed vibrato from config
         if ArticulationType.VIBRATO in note_art.articulations:
-            # Get tempo for tick conversion
-            tempo_bpm = 120  # Default tempo (could be extracted from score)
-            
-            # Get delayed vibrato config
+            # Get vibrato config
             vibrato_config = self.instrument_config.get('articulations', {}).get('vibrato_mark', {})
-            delay_ms = vibrato_config.get('delay_ms', 500)
-            ramp_ms = vibrato_config.get('ramp_duration_ms', 300)
-            target = vibrato_config.get('cc1_target', 64)
             
-            # Convert milliseconds to ticks
-            ticks_per_beat = self.ticks_per_beat
-            ms_per_beat = 60000 / tempo_bpm
-            delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
-            ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
-            
-            # Get delayed vibrato messages
-            vibrato_messages = self.cc_mapper.apply_vibrato_delayed(
-                target_depth=target,
-                delay_ticks=delay_ticks,
-                ramp_duration_ticks=ramp_ticks,
-                steps=8
-            )
-            
-            # Add vibrato CC messages with proper timing
-            for time_offset, cc_msg in vibrato_messages:
+            # Check minimum duration (default 0.5 seconds = 2 quarter notes)
+            min_duration = vibrato_config.get('min_duration_seconds', 0.5) * 2  # Convert to quarter notes
+            if note_art.duration < min_duration:
+                # Note too short for vibrato - skip it
                 messages.append(mido.Message(
                     'control_change',
                     channel=0,
-                    control=cc_msg.control,
-                    value=cc_msg.value,
-                    time=delta_time if not messages else time_offset
+                    control=SWAMCCMapper.CC_EXPRESSION,
+                    value=base_expression,
+                    time=delta_time
+                ))
+                self.last_cc11_value = base_expression
+                return messages
+            
+            # Get tempo for tick conversion
+            tempo_bpm = 120  # Default tempo (could be extracted from score)
+            ticks_per_beat = self.ticks_per_beat
+            ms_per_beat = 60000 / tempo_bpm
+            
+            # Determine pitch-dependent vibrato parameters
+            pitch_config = vibrato_config.get('pitch_dependent', {})
+            if pitch_config.get('enabled', True):
+                # Get MIDI pitch (C4 = 60, D4 = 62, D5 = 74)
+                pitch = note_art.pitch
+                low_threshold = 62  # D4
+                high_threshold = 74  # D5
+                
+                if pitch < low_threshold:
+                    # Low notes: wider, slower vibrato
+                    cc1_target = pitch_config.get('low_notes', {}).get('cc1_depth', 50)
+                    cc17_target = pitch_config.get('low_notes', {}).get('cc17_rate', 60)
+                elif pitch > high_threshold:
+                    # High notes: narrower, faster vibrato
+                    cc1_target = pitch_config.get('high_notes', {}).get('cc1_depth', 40)
+                    cc17_target = pitch_config.get('high_notes', {}).get('cc17_rate', 75)
+                else:
+                    # Mid notes: balanced vibrato
+                    cc1_target = pitch_config.get('mid_notes', {}).get('cc1_depth', 45)
+                    cc17_target = pitch_config.get('mid_notes', {}).get('cc17_rate', 67)
+            else:
+                # Fixed vibrato depth/rate
+                cc1_target = vibrato_config.get('cc1_target', 45)
+                cc17_target = vibrato_config.get('cc17_target', 67)
+            
+            # Get timing parameters
+            delay_ms = vibrato_config.get('delay_ms', 300)
+            ramp_ms = vibrato_config.get('ramp_duration_ms', 200)
+            delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
+            ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
+            
+            # Generate initial ramp for CC1 (Vibrato Depth)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_MODULATION,  # CC1
+                value=0,
+                time=delta_time
+            ))
+            
+            # Set CC17 (Vibrato Rate) at target immediately
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=17,  # CC17 - Vibrato Rate
+                value=cc17_target,
+                time=0
+            ))
+            
+            # Generate ramp to target depth
+            ramp_steps = 8
+            step_size = cc1_target / ramp_steps
+            time_step = ramp_ticks // ramp_steps
+            
+            # First message after delay
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_MODULATION,
+                value=int(step_size),
+                time=delay_ticks
+            ))
+            
+            # Remaining ramp steps
+            for i in range(2, ramp_steps + 1):
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_MODULATION,
+                    value=min(127, int(step_size * i)),
+                    time=time_step
                 ))
             
             # Add base expression
@@ -379,7 +460,10 @@ class MusicXMLToSWAM:
             ))
             
             self.last_cc11_value = base_expression
-            self.last_cc1_value = target  # Track vibrato depth
+            self.last_cc1_value = cc1_target  # Track vibrato depth
+            
+            # Store vibrato info for jitter generation (will be added after note-on)
+            note_art._vibrato_targets = (cc1_target, cc17_target, vibrato_config)
             
             return messages
         
@@ -644,6 +728,86 @@ class MusicXMLToSWAM:
                 value=breath_value,
                 time=0
             ))
+        
+        return messages
+    
+    def _generate_vibrato_jitter(
+        self,
+        note_art: NoteArticulation,
+        duration_ticks: int,
+        already_elapsed_ticks: int
+    ) -> List[mido.Message]:
+        """
+        Generate continuous jitter CC messages during vibrato sustain.
+        
+        Args:
+            note_art: Note articulation data (must have _vibrato_targets attribute)
+            duration_ticks: Total note duration in ticks
+            already_elapsed_ticks: Ticks already used for vibrato ramp
+            
+        Returns:
+            List of CC messages with timing offsets for jitter during sustain
+        """
+        import random
+        
+        messages = []
+        
+        # Check if vibrato jitter is configured
+        if not hasattr(note_art, '_vibrato_targets'):
+            return messages
+        
+        cc1_target, cc17_target, vibrato_config = note_art._vibrato_targets
+        jitter_config = vibrato_config.get('jitter', {})
+        
+        if not jitter_config.get('enabled', True):
+            return messages
+        
+        # Get jitter parameters
+        cc1_range = jitter_config.get('cc1_range', 5)
+        cc17_range = jitter_config.get('cc17_range', 3)
+        interval_ms = jitter_config.get('interval_ms', 50)
+        
+        # Convert interval to ticks
+        tempo_bpm = 120
+        ms_per_beat = 60000 / tempo_bpm
+        interval_ticks = int((interval_ms / ms_per_beat) * self.ticks_per_beat)
+        
+        # Calculate remaining sustain time
+        remaining_ticks = duration_ticks - already_elapsed_ticks
+        
+        if remaining_ticks <= 0:
+            return messages
+        
+        # Generate jitter messages at intervals
+        current_offset = interval_ticks
+        
+        while current_offset < remaining_ticks:
+            # Add jitter to CC1 (depth)
+            cc1_jitter = random.randint(-cc1_range, cc1_range)
+            cc1_value = max(0, min(127, cc1_target + cc1_jitter))
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_MODULATION,  # CC1
+                value=cc1_value,
+                time=current_offset if len(messages) == 0 else interval_ticks
+            ))
+            
+            # Add jitter to CC17 (rate) - less frequently (every other CC1 change)
+            if len(messages) % 2 == 1:
+                cc17_jitter = random.randint(-cc17_range, cc17_range)
+                cc17_value = max(0, min(127, cc17_target + cc17_jitter))
+                
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=17,  # CC17 - Vibrato Rate
+                    value=cc17_value,
+                    time=0
+                ))
+            
+            current_offset += interval_ticks
         
         return messages
     
