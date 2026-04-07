@@ -235,23 +235,11 @@ class MusicXMLToSWAM:
             has_glissando = ArticulationType.GLISSANDO in note_art.articulations
             has_vibrato = ArticulationType.VIBRATO in note_art.articulations
             
-            # Add vibrato jitter during note sustain if vibrato is marked
-            if has_vibrato and hasattr(note_art, '_vibrato_targets'):
-                # Calculate how much time was used for vibrato ramp
-                vibrato_config = note_art._vibrato_targets[2]
-                tempo_bpm = 120
-                ms_per_beat = 60000 / tempo_bpm
-                delay_ms = vibrato_config.get('delay_ms', 300)
-                ramp_ms = vibrato_config.get('ramp_duration_ms', 200)
-                elapsed_ticks = int(((delay_ms + ramp_ms) / ms_per_beat) * self.ticks_per_beat)
-                
-                # Generate jitter messages
-                jitter_messages = self._generate_vibrato_jitter(
-                    note_art,
-                    duration_ticks,
-                    elapsed_ticks
-                )
-                track.extend(jitter_messages)
+            # NOTE: Vibrato jitter during sustain disabled due to MIDI timing issues
+            # The jitter messages were accumulating time offsets and disrupting rhythm
+            # Vibrato ramp still works (happens before note-on), but continuous jitter
+            # during sustain needs a different implementation approach
+            # TODO: Re-implement jitter without disrupting note timing
             
             # Adjust duration for articulations
             if has_glissando:
@@ -408,7 +396,9 @@ class MusicXMLToSWAM:
             delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
             ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
             
-            # Generate initial ramp for CC1 (Vibrato Depth)
+            # Set initial vibrato state (no delay/ramp before note-on to preserve rhythm)
+            # CC1 starts at 0, CC17 at target rate
+            # Vibrato will be developed later if we re-implement sustain modulation
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
@@ -417,7 +407,6 @@ class MusicXMLToSWAM:
                 time=delta_time
             ))
             
-            # Set CC17 (Vibrato Rate) at target immediately
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
@@ -426,29 +415,14 @@ class MusicXMLToSWAM:
                 time=0
             ))
             
-            # Generate ramp to target depth
-            ramp_steps = 8
-            step_size = cc1_target / ramp_steps
-            time_step = ramp_ticks // ramp_steps
-            
-            # First message after delay
+            # Simple immediate vibrato (no delay/ramp for timing reasons)
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
                 control=SWAMCCMapper.CC_MODULATION,
-                value=int(step_size),
-                time=delay_ticks
+                value=cc1_target,
+                time=0
             ))
-            
-            # Remaining ramp steps
-            for i in range(2, ramp_steps + 1):
-                messages.append(mido.Message(
-                    'control_change',
-                    channel=0,
-                    control=SWAMCCMapper.CC_MODULATION,
-                    value=min(127, int(step_size * i)),
-                    time=time_step
-                ))
             
             # Add base expression
             messages.append(mido.Message(
@@ -517,12 +491,12 @@ class MusicXMLToSWAM:
                     delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
                     ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
                     
-                    # Generate baseline vibrato messages
+                    # Set baseline vibrato state (immediate, no delay/ramp for timing)
                     messages.append(mido.Message(
                         'control_change',
                         channel=0,
                         control=SWAMCCMapper.CC_MODULATION,  # CC1
-                        value=0,
+                        value=cc1_target,  # Set immediately to baseline level
                         time=delta_time
                     ))
                     
@@ -533,28 +507,6 @@ class MusicXMLToSWAM:
                         value=cc17_target,
                         time=0
                     ))
-                    
-                    # Generate ramp to baseline depth (fewer steps for subtlety)
-                    ramp_steps = 6
-                    step_size = cc1_target / ramp_steps
-                    time_step = ramp_ticks // ramp_steps
-                    
-                    messages.append(mido.Message(
-                        'control_change',
-                        channel=0,
-                        control=SWAMCCMapper.CC_MODULATION,
-                        value=int(step_size),
-                        time=delay_ticks
-                    ))
-                    
-                    for i in range(2, ramp_steps + 1):
-                        messages.append(mido.Message(
-                            'control_change',
-                            channel=0,
-                            control=SWAMCCMapper.CC_MODULATION,
-                            value=min(127, int(step_size * i)),
-                            time=time_step
-                        ))
                     
                     # Add base expression
                     messages.append(mido.Message(
