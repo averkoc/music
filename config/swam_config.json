@@ -275,6 +275,36 @@
   "global_settings": {
     "ticks_per_beat": 480,
     "default_tempo": 120,
+    "humanization": {
+      "_notes": [
+        "Humanization adds natural performance variations for realistic SWAM playback",
+        "Use --humanize flag: none, subtle, default, aggressive"
+      ],
+      "subtle": {
+        "timing_jitter_ms": 5.0,
+        "velocity_variation_percent": 4.0,
+        "duration_variation_percent": 1.5,
+        "expression_flutter": 2,
+        "bow_detach_variation_ms": 3.0,
+        "description": "Light, conservative humanization for precise performances"
+      },
+      "default": {
+        "timing_jitter_ms": 8.0,
+        "velocity_variation_percent": 7.0,
+        "duration_variation_percent": 2.0,
+        "expression_flutter": 4,
+        "bow_detach_variation_ms": 5.0,
+        "description": "Natural humanization for realistic SWAM performances"
+      },
+      "aggressive": {
+        "timing_jitter_ms": 12.0,
+        "velocity_variation_percent": 10.0,
+        "duration_variation_percent": 3.5,
+        "expression_flutter": 6,
+        "bow_detach_variation_ms": 8.0,
+        "description": "Obvious variation for expressive, 'human-like' imperfection"
+      }
+    },
     "cc_interpolation": true,
     "notes": "CC interpolation smooths transitions between CC values"
   }

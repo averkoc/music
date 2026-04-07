@@ -28,6 +28,13 @@ from articulation_detector import (
     DynamicLevel
 )
 from swam_cc_mapper import SWAMCCMapper, SWAMInstrument
+from humanizer import (
+    SWAMHumanizer,
+    HumanizationConfig,
+    create_default_humanizer,
+    create_subtle_humanizer,
+    create_aggressive_humanizer
+)
 
 
 class MusicXMLToSWAM:
@@ -35,18 +42,20 @@ class MusicXMLToSWAM:
     Converts MusicXML files to SWAM-optimized MIDI with articulation-aware CC messages.
     """
     
-    def __init__(self, instrument: SWAMInstrument, ticks_per_beat: int = 480):
+    def __init__(self, instrument: SWAMInstrument, ticks_per_beat: int = 480, humanizer: SWAMHumanizer = None):
         """
         Initialize the converter.
         
         Args:
             instrument: SWAM instrument type
             ticks_per_beat: MIDI ticks per quarter note
+            humanizer: Optional humanizer for natural performance variation
         """
         self.instrument = instrument
         self.ticks_per_beat = ticks_per_beat
         self.cc_mapper = SWAMCCMapper(instrument)
         self.detector = MusicXMLArticulationDetector()
+        self.humanizer = humanizer  # Can be None for precise mode
         # Track last CC values for smooth transitions
         self.last_cc11_value = 80  # Expression
         self.last_cc74_value = 64  # Brightness
@@ -143,15 +152,30 @@ class MusicXMLToSWAM:
         # Process each note with articulation-specific CC messages
         current_time = 0
         note_off_queue = []  # Track delayed note-offs for overlapping notes
+        total_notes = len(note_articulations)
+        tempo_bpm = mido.tempo2bpm(tempo)
         
         for i, note_art in enumerate(note_articulations):
             # Calculate delta time
             note_time_ticks = int(note_art.onset_time * self.ticks_per_beat)
+            
+            # Apply humanization to timing if enabled (but ensure notes don't go backwards)
+            if self.humanizer:
+                humanized_time = self.humanizer.humanize_timing(
+                    note_time_ticks,
+                    self.ticks_per_beat,
+                    tempo_bpm
+                )
+                # Ensure this note doesn't come before current time
+                note_time_ticks = max(current_time + 1, humanized_time)
+            
             delta_time = note_time_ticks - current_time
             
             # Process any queued note-offs that should happen before this note
             while note_off_queue and note_off_queue[0][0] <= note_time_ticks:
                 off_time, off_note, off_has_gliss = note_off_queue.pop(0)
+                # Ensure note-off doesn't go backwards
+                off_time = max(current_time, off_time)
                 time_from_current = off_time - current_time
                 
                 # Add note off
@@ -173,18 +197,23 @@ class MusicXMLToSWAM:
                         time=0
                     ))
             
-            # Recalculate delta time after processing note-offs
-            delta_time = note_time_ticks - current_time
+            # Recalculate delta time after processing note-offs, ensure non-negative
+            delta_time = max(0, note_time_ticks - current_time)
             
             # Add CC messages for this note based on articulation
-            cc_messages = self._generate_cc_for_note(note_art, delta_time)
+            cc_messages = self._generate_cc_for_note(note_art, delta_time, i, total_notes)
             track.extend(cc_messages)
+            
+            # Apply humanization to velocity if enabled
+            velocity = note_art.velocity
+            if self.humanizer:
+                velocity = self.humanizer.humanize_velocity(velocity)
             
             # Add note on
             track.append(mido.Message(
                 'note_on',
                 note=note_art.pitch,
-                velocity=note_art.velocity,
+                velocity=velocity,
                 time=0 if cc_messages else delta_time
             ))
             
@@ -207,12 +236,18 @@ class MusicXMLToSWAM:
             elif ArticulationType.STACCATISSIMO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.20)  # 20% for very short notes
             
+            # Apply humanization to duration if enabled
+            if self.humanizer and not has_glissando:  # Don't humanize glissando timing
+                duration_ticks = self.humanizer.humanize_duration(duration_ticks)
+            
             # Queue the note off
             note_off_time = note_time_ticks + duration_ticks
             note_off_queue.append((note_off_time, note_art.pitch, has_glissando))
         
         # Process any remaining note-offs
         for off_time, off_note, off_has_gliss in note_off_queue:
+            # Ensure note-off doesn't go backwards
+            off_time = max(current_time, off_time)
             time_from_current = off_time - current_time
             track.append(mido.Message(
                 'note_off',
@@ -242,13 +277,19 @@ class MusicXMLToSWAM:
     def _generate_cc_for_note(
         self,
         note_art: NoteArticulation,
-        delta_time: int
+        delta_time: int,
+        note_index: int = 0,
+        total_notes: int = 1
     ) -> List[mido.Message]:
         """Generate CC messages for a note based on its articulations."""
         messages = []
         
         # Base expression from dynamic level
         base_expression = note_art.dynamic_level.cc_value if note_art.dynamic_level else 80
+        
+        # Apply humanization to expression if enabled
+        if self.humanizer and self.humanizer.should_add_expression_flutter():
+            base_expression = self.humanizer.humanize_expression(base_expression)
         
         # Check for glissando - requires high portamento CC5
         if ArticulationType.GLISSANDO in note_art.articulations:
@@ -626,6 +667,13 @@ def main():
         help="SWAM instrument type"
     )
     parser.add_argument(
+        "--humanize",
+        type=str,
+        choices=["none", "subtle", "default", "aggressive"],
+        default="none",
+        help="Humanization level: none (precise), subtle (light variation), default (natural), aggressive (obvious variation)"
+    )
+    parser.add_argument(
         "-o", "--output",
         type=str,
         help="Output MIDI file path (default: midi_output/[input]_[instrument]_swam.mid)"
@@ -653,8 +701,26 @@ def main():
     # Map instrument string to enum
     instrument = SWAMInstrument.VIOLIN if args.instrument == "violin" else SWAMInstrument.SAXOPHONE
     
+    # Create humanizer based on flag
+    humanizer = None
+    if args.humanize == "subtle":
+        humanizer = create_subtle_humanizer()
+        if args.verbose:
+            print("Humanization: Subtle (light variation)")
+    elif args.humanize == "default":
+        humanizer = create_default_humanizer()
+        if args.verbose:
+            print("Humanization: Default (natural performance)")
+    elif args.humanize == "aggressive":
+        humanizer = create_aggressive_humanizer()
+        if args.verbose:
+            print("Humanization: Aggressive (obvious variation)")
+    else:
+        if args.verbose:
+            print("Humanization: None (precise)")
+    
     # Process the file
-    processor = MusicXMLToSWAM(instrument)
+    processor = MusicXMLToSWAM(instrument, humanizer=humanizer)
     processor.process_file(input_path, output_path, args.verbose)
     
     print(f"✓ Processed file saved to: {output_path}")
