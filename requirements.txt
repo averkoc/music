@@ -2,9 +2,6 @@
 mido==1.3.0
 # python-rtmidi==1.5.8  # Not needed for file-based MIDI processing
 
-# Data Processing
-numpy==1.24.3
-
 # Configuration
 pyyaml==6.0.1
 
