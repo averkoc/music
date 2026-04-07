@@ -66,12 +66,12 @@
           "description": "Gradual decrease in volume"
         },
         "staccato": {
-          "note_duration_percent": 35,
+          "note_duration_percent": 25,
           "cc11_spike": 115,
           "cc11_base_offset": 0,
           "attack_ticks": 3,
           "description": "Short, detached notes with sharp attack",
-          "notes": "Sharp CC11 spike with quick decay; 30-40% duration for crisp articulation"
+          "notes": "Sharp CC11 spike with quick decay; 25% duration for beat-like precision"
         },
         "legato": {
           "cc64": 127,
@@ -98,8 +98,17 @@
         },
         "accent": {
           "cc11_peak": 110,
+          "cc74_brightness": 20,
+          "attack_decay_ticks": 10,
           "velocity_boost": 20,
-          "description": "Emphasized note attack"
+          "description": "Emphasized note attack with spike then sustain"
+        },
+        "marcato": {
+          "cc11_peak": 120,
+          "cc74_brightness": 25,
+          "attack_decay_ticks": 15,
+          "velocity_boost": 25,
+          "description": "Very strong accent with heavy attack"
         },
         "sul_ponticello": {
           "cc9_value": 115,

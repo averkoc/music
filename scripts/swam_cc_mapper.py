@@ -253,6 +253,86 @@ class SWAMCCMapper:
         
         return messages
     
+    def apply_accent(
+        self,
+        base_cc11: int,
+        peak_value: int = 110,
+        sustain_value: int = None
+    ) -> List[Tuple[int, mido.Message]]:
+        """
+        Apply accent articulation: spike CC11 then sustain at normal level.
+        
+        Args:
+            base_cc11: Baseline expression value
+            peak_value: Peak CC11 value for accent (default 110)
+            sustain_value: Sustained level after attack (defaults to base_cc11)
+            
+        Returns:
+            List of (time, message) tuples for accent effect
+        """
+        messages = []
+        sustain = sustain_value if sustain_value is not None else base_cc11
+        
+        # Sharp attack spike
+        messages.append((0, mido.Message(
+            'control_change',
+            channel=self.channel,
+            control=self.CC_EXPRESSION,
+            value=peak_value,
+            time=0
+        )))
+        
+        # Quick decay to sustained level (10 ticks)
+        messages.append((10, mido.Message(
+            'control_change',
+            channel=self.channel,
+            control=self.CC_EXPRESSION,
+            value=sustain,
+            time=0
+        )))
+        
+        return messages
+    
+    def apply_marcato(
+        self,
+        base_cc11: int,
+        peak_value: int = 120,
+        sustain_value: int = None
+    ) -> List[Tuple[int, mido.Message]]:
+        """
+        Apply marcato articulation: very strong spike then sustain.
+        
+        Args:
+            base_cc11: Baseline expression value
+            peak_value: Peak CC11 value for marcato (default 120)
+            sustain_value: Sustained level after attack (defaults to base_cc11)
+            
+        Returns:
+            List of (time, message) tuples for marcato effect
+        """
+        messages = []
+        sustain = sustain_value if sustain_value is not None else base_cc11
+        
+        # Very strong attack spike
+        messages.append((0, mido.Message(
+            'control_change',
+            channel=self.channel,
+            control=self.CC_EXPRESSION,
+            value=peak_value,
+            time=0
+        )))
+        
+        # Slightly slower decay than accent (15 ticks)
+        messages.append((15, mido.Message(
+            'control_change',
+            channel=self.channel,
+            control=self.CC_EXPRESSION,
+            value=sustain,
+            time=0
+        )))
+        
+        return messages
+    
     def apply_vibrato_delayed(
         self,
         target_depth: int = 64,

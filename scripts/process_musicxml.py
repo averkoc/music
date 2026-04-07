@@ -161,7 +161,7 @@ class MusicXMLToSWAM:
             
             # Adjust duration for staccato articulations
             if ArticulationType.STACCATO in note_art.articulations:
-                duration_ticks = int(duration_ticks * 0.35)  # 35% for crisp staccato
+                duration_ticks = int(duration_ticks * 0.25)  # 25% for beat-like precision
             elif ArticulationType.STACCATISSIMO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.20)  # 20% for very short notes
             
@@ -225,7 +225,63 @@ class MusicXMLToSWAM:
             
             return messages
         
-        # For non-staccato, modify based on articulations
+        # Check for accent articulations - use CC spike patterns
+        if ArticulationType.MARCATO in note_art.articulations:
+            # Marcato: very strong attack with sustain
+            marcato_messages = self.cc_mapper.apply_marcato(
+                base_cc11=base_expression,
+                peak_value=120
+            )
+            
+            for time_offset, cc_msg in marcato_messages:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=cc_msg.control,
+                    value=cc_msg.value,
+                    time=delta_time if not messages else time_offset
+                ))
+            
+            # Add brightness
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BRIGHTNESS,
+                value=min(127, 64 + 25),
+                time=0
+            ))
+            
+            return messages
+        
+        if ArticulationType.ACCENT in note_art.articulations or ArticulationType.STRONG_ACCENT in note_art.articulations:
+            # Accent: emphasized attack with sustain
+            peak = 115 if ArticulationType.STRONG_ACCENT in note_art.articulations else 110
+            accent_messages = self.cc_mapper.apply_accent(
+                base_cc11=base_expression,
+                peak_value=peak
+            )
+            
+            for time_offset, cc_msg in accent_messages:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=cc_msg.control,
+                    value=cc_msg.value,
+                    time=delta_time if not messages else time_offset
+                ))
+            
+            # Add brightness
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BRIGHTNESS,
+                value=min(127, 64 + 20),
+                time=0
+            ))
+            
+            return messages
+        
+        # For other articulations, modify based on type
         expression_value = base_expression
         brightness_value = 64
         modulation_value = 0
@@ -235,16 +291,8 @@ class MusicXMLToSWAM:
                 expression_value = max(20, expression_value - 30)
                 brightness_value = min(127, brightness_value + 25)
             
-            elif art == ArticulationType.ACCENT or art == ArticulationType.STRONG_ACCENT:
-                expression_value = min(127, expression_value + 25)
-                brightness_value = min(127, brightness_value + 20)
-            
             elif art == ArticulationType.TENUTO:
                 expression_value = min(127, expression_value + 5)
-            
-            elif art == ArticulationType.MARCATO:
-                expression_value = min(127, expression_value + 30)
-                brightness_value = min(127, brightness_value + 25)
         
         # Add vibrato for longer notes
         if note_art.duration >= 2.0:  # Half note or longer
