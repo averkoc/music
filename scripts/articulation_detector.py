@@ -193,6 +193,19 @@ class MusicXMLArticulationDetector:
         for articulation in note_obj.articulations:
             art_name = articulation.__class__.__name__.lower()
             
+            # MuseScore vibrato: Generic "Articulation" class (not a subclass)
+            # These are often SMuFL wiggle/vibrato symbols that music21 doesn't parse specifically
+            if art_name == 'articulation':
+                # Likely a custom articulation like vibrato (wiggleVibratoLargeSlowest, etc.)
+                articulations.append(ArticulationType.VIBRATO)
+                continue
+            
+            # Check for MuseScore SMuFL vibrato symbols in string representation
+            art_str = str(articulation).lower()
+            if 'vibrato' in art_str or 'wiggle' in art_str:
+                articulations.append(ArticulationType.VIBRATO)
+                continue
+            
             if 'staccatissimo' in art_name:
                 articulations.append(ArticulationType.STACCATISSIMO)
             elif 'staccato' in art_name:
