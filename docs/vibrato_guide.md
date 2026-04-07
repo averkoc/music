@@ -4,10 +4,25 @@ This guide covers the sophisticated vibrato implementation designed for realisti
 
 ## Overview
 
-The vibrato system implements recommendations from professional SWAM users and AI analysis to create vibrato that sounds like a living, breathing performer rather than a synthesizer. It uses:
+The vibrato system implements recommendations from professional SWAM users and AI analysis to create vibrato that sounds like a living, breathing performer rather than a synthesizer. It uses **two levels of vibrato**:
 
-- **CC1 (Modulation)**: Vibrato depth
-- **CC17**: Vibrato rate/speed  
+### 1. Baseline Vibrato (Automatic, ~20-25% intensity)
+Applied automatically to all sustained notes (quarter notes and longer) without any marking required. This mimics how real violinists use subtle vibrato as part of their fundamental tone production.
+
+- **CC1 Depth**: 20-28 (pitch-dependent)
+- **CC17 Rate**: 62-68
+- **When**: All quarter notes+ except staccato/staccatissimo/spiccato
+- **Purpose**: Natural, warm tone on sustained notes
+
+### 2. Explicit Vibrato (Marked notes, full intensity)
+Applied to notes with vibrato marks in MuseScore. This creates stronger, more expressive vibrato for passages where the composer/performer wants pronounced vibrato.
+
+- **CC1 Depth**: 40-50 (pitch-dependent)
+- **CC17 Rate**: 60-75
+- **When**: Notes with wavy lines or vibrato articulation marks
+- **Purpose**: Expressive, pronounced vibrato for marked passages
+
+Both levels feature:
 - **Pitch-dependent parameters**: Different vibrato for low, mid, and high notes
 - **Continuous jitter**: Human-like variation that breaks synthetic patterns
 - **Natural onset**: Delayed ramp (notes start clean, vibrato develops gradually)
@@ -22,9 +37,20 @@ Setting CC1 to a constant value (e.g., CC1=64 throughout) creates an unnatural, 
 
 ## How to Add Vibrato in MuseScore
 
+### Baseline Vibrato (Automatic - No Marks Needed)
+All sustained notes (quarter notes and longer) automatically receive subtle baseline vibrato (~20-25% intensity). **You don't need to add any markings** for natural-sounding vibrato on most notes.
+
+**Excluded articulations:**
+- Staccato, staccatissimo, spiccato automatically skip baseline vibrato
+- Short notes (< quarter note duration) are excluded
+- This ensures crisp, clean articulation for short notes
+
+### Explicit Vibrato (For Stronger Effect)
+Add these markings when you want **more pronounced, expressive vibrato** beyond the baseline:
+
 Vibrato can be notated in MuseScore in several ways, and the converter now detects all of them:
 
-### Method 1: Wavy Line (Recommended)
+### Method 1: Wavy Line (Recommended for Explicit Vibrato)
 1. Select the note where vibrato should start
 2. From the palette, go to **Lines** → **Wavy Line** (or Trill line)
 3. Drag and extend the wavy line to cover the desired notes
@@ -57,7 +83,38 @@ If you use other custom articulations that shouldn't be vibrato, prefer the wavy
 
 ## How the Converter Handles Vibrato
 
-When vibrato is detected on a note, the converter creates a sophisticated multi-stage vibrato:
+The converter uses a **two-level vibrato system** to create realistic performance:
+
+### Priority System
+1. **Explicit vibrato marks** take precedence (wavy lines, articulation marks)
+2. **Baseline vibrato** applies to remaining sustained notes
+3. **No vibrato** for staccato, staccatissimo, spiccato, or very short notes
+
+### Level 1: Baseline Vibrato (Automatic)
+Applied to all quarter notes and longer **without any markings**, unless excluded:
+
+**Characteristics:**
+- **CC1 Depth**: 22-28 (pitch-dependent) - subtle, ~20-25% intensity
+- **CC17 Rate**: 62-68
+- **Delay**: 250ms (note starts clean)
+- **Ramp**: 200ms over 6 steps (gentle development)
+- **Jitter**: ±3 CC1, ±2 CC17 (subtle variation)
+
+**Example for F4 (mid-range, 1 second):**
+```
+t=0ms:    Note ON, CC1=0, CC17=65
+t=250ms:  CC1 ramps to 25 over 200ms (6 steps)
+t=450ms:  Target reached (CC1=25)
+t=450-1000ms: Subtle jitter (CC1: 22-28, CC17: 63-67)
+```
+
+**Excluded from baseline vibrato:**
+- Staccato, staccatissimo, spiccato articulations
+- Notes shorter than quarter notes
+- Notes with explicit vibrato marks (use explicit settings instead)
+
+### Level 2: Explicit Vibrato (Marked Notes)
+When vibrato is detected via markings, the converter creates stronger, multi-stage vibrato:
 
 ### Stage 1: Duration Check
 - **Minimum duration**: 0.5 seconds (configurable)
@@ -120,21 +177,32 @@ Time    CC1   CC17  Description
 
 ## Sweet Spot Values
 
-Based on professional recommendations:
+Based on professional recommendations and real violin performance practice:
+
+### Two-Level Vibrato System
+
+| Vibrato Type | CC1 (Depth) | CC17 (Rate) | Use Case |
+|--------------|-------------|-------------|----------|
+| **Baseline** (automatic) | 20-28 | 62-68 | All sustained notes (~20-25% intensity) |
+| **Explicit** (marked) | 40-55 | 60-75 | Vibrato marks (full intensity) |
+
+### General CC Value Ranges
 
 | Parameter | Recommended Range | Notes |
 |-----------|------------------|-------|
-| **CC1 (Depth)** | 30-55 | Classical natural range. 80+ sounds "nervous" |
+| **CC1 (Depth)** | 20-55 | Baseline: 20-28, Explicit: 40-55. Above 80 sounds "nervous" |
 | **CC17 (Rate)** | 60-75 | Natural hand speed. <40 = sickly, >90 = jittery |
 
 Current defaults:
-- Low notes: CC1=50, CC17=60
-- Mid notes: CC1=45, CC17=67  
-- High notes: CC1=40, CC17=75
+- **Baseline vibrato**: CC1=22-28, CC17=62-68 (pitch-dependent)
+- **Explicit vibrato**: CC1=40-50, CC17=60-75 (pitch-dependent)
 
 ## Configuration
 
-All vibrato settings in [config/swam_config.json](../config/swam_config.json) under `vibrato_mark`:
+All vibrato settings in [config/swam_config.json](../config/swam_config.json):
+
+### Explicit Vibrato (Marked Notes)
+Under `vibrato_mark` section:
 
 ```json
 "vibrato_mark": {
@@ -153,6 +221,10 @@ All vibrato settings in [config/swam_config.json](../config/swam_config.json) un
       "threshold": "D5",
       "cc1_depth": 40,
       "cc17_rate": 75
+    },
+    "mid_notes": {
+      "cc1_depth": 45,
+      "cc17_rate": 67
     }
   },
   "jitter": {
@@ -165,14 +237,61 @@ All vibrato settings in [config/swam_config.json](../config/swam_config.json) un
 }
 ```
 
+### Baseline Vibrato (Automatic)
+Under `default_vibrato` section:
+
+```json
+"default_vibrato": {
+  "enabled": true,
+  "cc1_target": 25,
+  "cc17_target": 65,
+  "delay_ms": 250,
+  "ramp_duration_ms": 200,
+  "min_duration_quarters": 1.0,
+  "pitch_dependent": {
+    "enabled": true,
+    "low_notes": {
+      "cc1_depth": 28,
+      "cc17_rate": 62
+    },
+    "high_notes": {
+      "cc1_depth": 22,
+      "cc17_rate": 68
+    },
+    "mid_notes": {
+      "cc1_depth": 25,
+      "cc17_rate": 65
+    }
+  },
+  "jitter": {
+    "enabled": true,
+    "cc1_range": 3,
+    "cc17_range": 2,
+    "interval_ms": 60
+  },
+  "exclude_articulations": ["staccato", "staccatissimo", "spiccato"]
+}
+```
+
 ### Customization Tips
 
-**For more intense vibrato:**
-- Increase `cc1_target` to 55-60
+**To disable baseline vibrato** (only use explicit marks):
+```json
+"default_vibrato": {
+  "enabled": false
+}
+```
+
+**To adjust baseline intensity:**
+- Increase `cc1_target` to 30-35 for more noticeable baseline
+- Decrease `cc1_target` to 15-20 for very subtle baseline
+
+**For more intense explicit vibrato:**
+- Increase `vibrato_mark.cc1_target` to 55-60
 - Increase `cc1_range` to 7-8 for more variation
 
-**For subtle vibrato:**
-- Decrease `cc1_target` to 35-40
+**For subtle explicit vibrato:**
+- Decrease `vibrato_mark.cc1_target` to 35-40
 - Decrease `cc1_range` to 3-4
 
 **For faster onset:**
@@ -195,7 +314,19 @@ All vibrato settings in [config/swam_config.json](../config/swam_config.json) un
 
 ## Example: Applying Vibrato in MuseScore
 
-### For a sustained note:
+### For a sustained note without markings (baseline vibrato):
+```
+MuseScore notation:
+[Whole note C] (no markings)
+
+MIDI output:
+t=0ms:    Note ON C, CC1=0, CC17=65 (baseline rate)
+t=250ms:  CC1 ramps 0 → 25 (6 steps over 200ms)
+t=450ms:  Subtle jitter begins (CC1: 22-28, CC17: 63-67)
+t=3840ms: Note OFF
+```
+
+### For a sustained note with vibrato mark (explicit vibrato):
 ```
 MuseScore notation:
 [Whole note C] ~~~~~ (wavy line)
