@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -56,6 +57,16 @@ class MusicXMLToSWAM:
         self.cc_mapper = SWAMCCMapper(instrument)
         self.detector = MusicXMLArticulationDetector()
         self.humanizer = humanizer  # Can be None for precise mode
+        
+        # Load config from swam_config.json
+        config_path = Path(__file__).parent.parent / "config" / "swam_config.json"
+        with open(config_path, 'r') as f:
+            self.config = json.load(f)
+        
+        # Get instrument-specific config
+        instrument_name = instrument.value  # 'violin' or 'saxophone'
+        self.instrument_config = self.config.get('instruments', {}).get(instrument_name, {})
+        
         # Track last CC values for smooth transitions
         self.last_cc11_value = 80  # Expression
         self.last_cc74_value = 64  # Brightness
@@ -323,6 +334,55 @@ class MusicXMLToSWAM:
             self.last_cc11_value = base_expression
             return messages
         
+        # Check for vibrato articulation mark - use delayed vibrato from config
+        if ArticulationType.VIBRATO in note_art.articulations:
+            # Get tempo for tick conversion
+            tempo_bpm = 120  # Default tempo (could be extracted from score)
+            
+            # Get delayed vibrato config
+            vibrato_config = self.instrument_config.get('articulations', {}).get('vibrato_mark', {})
+            delay_ms = vibrato_config.get('delay_ms', 500)
+            ramp_ms = vibrato_config.get('ramp_duration_ms', 300)
+            target = vibrato_config.get('cc1_target', 64)
+            
+            # Convert milliseconds to ticks
+            ticks_per_beat = self.ticks_per_beat
+            ms_per_beat = 60000 / tempo_bpm
+            delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
+            ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
+            
+            # Get delayed vibrato messages
+            vibrato_messages = self.cc_mapper.apply_vibrato_delayed(
+                target_depth=target,
+                delay_ticks=delay_ticks,
+                ramp_duration_ticks=ramp_ticks,
+                steps=8
+            )
+            
+            # Add vibrato CC messages with proper timing
+            for time_offset, cc_msg in vibrato_messages:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=cc_msg.control,
+                    value=cc_msg.value,
+                    time=delta_time if not messages else time_offset
+                ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            self.last_cc11_value = base_expression
+            self.last_cc1_value = target  # Track vibrato depth
+            
+            return messages
+        
         # Check for staccato first - requires special CC spike pattern
         if ArticulationType.STACCATO in note_art.articulations:
             # Use SWAM staccato spike: quick CC11 peak then drop
@@ -432,11 +492,13 @@ class MusicXMLToSWAM:
             elif art == ArticulationType.TENUTO:
                 expression_value = min(127, expression_value + 5)
         
-        # Add vibrato for longer notes
-        if note_art.duration >= 2.0:  # Half note or longer
-            modulation_value = 64  # Moderate vibrato
-        elif note_art.duration >= 1.0:  # Quarter note
-            modulation_value = 48  # Light vibrato
+        # Automatic vibrato disabled - use explicit vibrato articulation marks instead
+        # If you want automatic vibrato, add it in MuseScore using vibrato marks
+        # (keeping this commented code for reference)
+        # if note_art.duration >= 2.0:  # Half note or longer
+        #     modulation_value = 64  # Moderate vibrato
+        # elif note_art.duration >= 1.0:  # Quarter note
+        #     modulation_value = 48  # Light vibrato
         
         # Add expression CC with smooth transition from previous value
         if abs(expression_value - self.last_cc11_value) > 5:
@@ -542,6 +604,16 @@ class MusicXMLToSWAM:
                     time=0
                 ))
             self.last_cc1_value = modulation_value
+        elif self.last_cc1_value > 0:
+            # Turn off vibrato if it was on previously
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_MODULATION,
+                value=0,
+                time=0
+            ))
+            self.last_cc1_value = 0
         
         # Add legato (sustain) for slurred notes
         if note_art.in_slur:
