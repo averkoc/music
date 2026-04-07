@@ -126,6 +126,44 @@
           "description": "Natural vibrato with pitch-dependent depth/rate and continuous jitter",
           "notes": "CC1=depth (30-55), CC17=rate (60-75). Short notes skip vibrato. Jitter breaks synthetic pattern."
         },
+        "default_vibrato": {
+          "enabled": true,
+          "cc1_target": 25,
+          "cc17_target": 65,
+          "delay_ms": 250,
+          "ramp_duration_ms": 200,
+          "min_duration_quarters": 1.0,
+          "pitch_dependent": {
+            "enabled": true,
+            "low_notes": {
+              "threshold": "D4",
+              "cc1_depth": 28,
+              "cc17_rate": 62,
+              "description": "Subtle baseline vibrato on low strings"
+            },
+            "high_notes": {
+              "threshold": "D5",
+              "cc1_depth": 22,
+              "cc17_rate": 68,
+              "description": "Lighter baseline vibrato on high strings"
+            },
+            "mid_notes": {
+              "cc1_depth": 25,
+              "cc17_rate": 65,
+              "description": "Balanced baseline for middle register"
+            }
+          },
+          "jitter": {
+            "enabled": true,
+            "cc1_range": 3,
+            "cc17_range": 2,
+            "interval_ms": 60,
+            "description": "Subtle variation for baseline vibrato"
+          },
+          "exclude_articulations": ["staccato", "staccatissimo", "spiccato"],
+          "description": "Baseline vibrato for all sustained notes (~20-30% intensity)",
+          "notes": "Real violinists use vibrato as fundamental tone production. Applies to quarter notes+ unless excluded. Lower intensity than explicit vibrato marks."
+        },
         "accent": {
           "cc11_peak": 110,
           "cc74_brightness": 20,

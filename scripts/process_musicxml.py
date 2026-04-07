@@ -467,6 +467,112 @@ class MusicXMLToSWAM:
             
             return messages
         
+        # Apply default baseline vibrato to sustained notes without explicit vibrato marks
+        # (Real violinists use vibrato as fundamental tone production)
+        default_vibrato_config = self.instrument_config.get('articulations', {}).get('default_vibrato', {})
+        if default_vibrato_config.get('enabled', True):
+            # Check duration threshold
+            min_duration = default_vibrato_config.get('min_duration_quarters', 1.0)
+            if note_art.duration >= min_duration:
+                # Check for excluded articulations
+                excluded_types = default_vibrato_config.get('exclude_articulations', ['staccato', 'staccatissimo', 'spiccato'])
+                excluded_enum = []
+                if 'staccato' in excluded_types:
+                    excluded_enum.append(ArticulationType.STACCATO)
+                if 'staccatissimo' in excluded_types:
+                    excluded_enum.append(ArticulationType.STACCATISSIMO)
+                if 'spiccato' in excluded_types:
+                    excluded_enum.append(ArticulationType.SPICCATO)
+                
+                # Apply baseline vibrato if no excluded articulations present
+                if not any(art in note_art.articulations for art in excluded_enum):
+                    # Get tempo for tick conversion
+                    tempo_bpm = 120
+                    ticks_per_beat = self.ticks_per_beat
+                    ms_per_beat = 60000 / tempo_bpm
+                    
+                    # Determine pitch-dependent baseline vibrato
+                    pitch_config = default_vibrato_config.get('pitch_dependent', {})
+                    if pitch_config.get('enabled', True):
+                        pitch = note_art.pitch
+                        low_threshold = 62  # D4
+                        high_threshold = 74  # D5
+                        
+                        if pitch < low_threshold:
+                            cc1_target = pitch_config.get('low_notes', {}).get('cc1_depth', 28)
+                            cc17_target = pitch_config.get('low_notes', {}).get('cc17_rate', 62)
+                        elif pitch > high_threshold:
+                            cc1_target = pitch_config.get('high_notes', {}).get('cc1_depth', 22)
+                            cc17_target = pitch_config.get('high_notes', {}).get('cc17_rate', 68)
+                        else:
+                            cc1_target = pitch_config.get('mid_notes', {}).get('cc1_depth', 25)
+                            cc17_target = pitch_config.get('mid_notes', {}).get('cc17_rate', 65)
+                    else:
+                        cc1_target = default_vibrato_config.get('cc1_target', 25)
+                        cc17_target = default_vibrato_config.get('cc17_target', 65)
+                    
+                    # Get timing parameters
+                    delay_ms = default_vibrato_config.get('delay_ms', 250)
+                    ramp_ms = default_vibrato_config.get('ramp_duration_ms', 200)
+                    delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
+                    ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
+                    
+                    # Generate baseline vibrato messages
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_MODULATION,  # CC1
+                        value=0,
+                        time=delta_time
+                    ))
+                    
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=17,  # CC17 - Vibrato Rate
+                        value=cc17_target,
+                        time=0
+                    ))
+                    
+                    # Generate ramp to baseline depth (fewer steps for subtlety)
+                    ramp_steps = 6
+                    step_size = cc1_target / ramp_steps
+                    time_step = ramp_ticks // ramp_steps
+                    
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_MODULATION,
+                        value=int(step_size),
+                        time=delay_ticks
+                    ))
+                    
+                    for i in range(2, ramp_steps + 1):
+                        messages.append(mido.Message(
+                            'control_change',
+                            channel=0,
+                            control=SWAMCCMapper.CC_MODULATION,
+                            value=min(127, int(step_size * i)),
+                            time=time_step
+                        ))
+                    
+                    # Add base expression
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_EXPRESSION,
+                        value=base_expression,
+                        time=0
+                    ))
+                    
+                    self.last_cc11_value = base_expression
+                    self.last_cc1_value = cc1_target
+                    
+                    # Store vibrato info for jitter
+                    note_art._vibrato_targets = (cc1_target, cc17_target, default_vibrato_config)
+                    
+                    return messages
+        
         # Check for staccato first - requires special CC spike pattern
         if ArticulationType.STACCATO in note_art.articulations:
             # Use SWAM staccato spike: quick CC11 peak then drop
