@@ -47,6 +47,10 @@ class MusicXMLToSWAM:
         self.ticks_per_beat = ticks_per_beat
         self.cc_mapper = SWAMCCMapper(instrument)
         self.detector = MusicXMLArticulationDetector()
+        # Track last CC values for smooth transitions
+        self.last_cc11_value = 80  # Expression
+        self.last_cc74_value = 64  # Brightness
+        self.last_cc1_value = 0    # Modulation/vibrato
     
     def process_file(
         self,
@@ -223,6 +227,9 @@ class MusicXMLToSWAM:
                 time=0
             ))
             
+            # Update last CC11 value (staccato returns to base)
+            self.last_cc11_value = base_expression
+            
             return messages
         
         # Check for accent articulations - use CC spike patterns
@@ -250,6 +257,9 @@ class MusicXMLToSWAM:
                 value=min(127, 64 + 25),
                 time=0
             ))
+            
+            # Update last CC11 value (marcato sustains at base)
+            self.last_cc11_value = base_expression
             
             return messages
         
@@ -279,6 +289,9 @@ class MusicXMLToSWAM:
                 time=0
             ))
             
+            # Update last CC11 value (accent sustains at base)
+            self.last_cc11_value = base_expression
+            
             return messages
         
         # For other articulations, modify based on type
@@ -300,34 +313,110 @@ class MusicXMLToSWAM:
         elif note_art.duration >= 1.0:  # Quarter note
             modulation_value = 48  # Light vibrato
         
-        # Add expression CC
-        messages.append(mido.Message(
-            'control_change',
-            channel=0,
-            control=SWAMCCMapper.CC_EXPRESSION,
-            value=expression_value,
-            time=delta_time
-        ))
+        # Add expression CC with smooth transition from previous value
+        if abs(expression_value - self.last_cc11_value) > 5:
+            # Significant change - create smooth ramp
+            ramp_duration = min(delta_time, 30)  # Ramp over available time, max 30 ticks
+            ramp_steps = max(2, min(4, ramp_duration // 8))  # 2-4 steps depending on time
+            
+            cc11_ramp = self.cc_mapper._create_ramp(
+                cc_number=SWAMCCMapper.CC_EXPRESSION,
+                start_value=self.last_cc11_value,
+                end_value=expression_value,
+                duration_ticks=ramp_duration,
+                steps=ramp_steps
+            )
+            
+            # Add ramped messages with adjusted timing
+            for i, (time_offset, msg) in enumerate(cc11_ramp):
+                if i == 0:
+                    # First message uses the delta_time
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=msg.control,
+                        value=msg.value,
+                        time=delta_time
+                    ))
+                else:
+                    # Subsequent messages use their offsets
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=msg.control,
+                        value=msg.value,
+                        time=time_offset
+                    ))
+        else:
+            # Small or no change - direct transition
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=expression_value,
+                time=delta_time
+            ))
         
-        # Add brightness CC for articulated notes
+        # Update tracked value
+        self.last_cc11_value = expression_value
+        
+        # Add brightness CC with smooth transition
         if brightness_value != 64:
-            messages.append(mido.Message(
-                'control_change',
-                channel=0,
-                control=SWAMCCMapper.CC_BRIGHTNESS,
-                value=brightness_value,
-                time=0
-            ))
+            if abs(brightness_value - self.last_cc74_value) > 10:
+                # Significant brightness change - smooth it
+                cc74_ramp = self.cc_mapper._create_ramp(
+                    cc_number=SWAMCCMapper.CC_BRIGHTNESS,
+                    start_value=self.last_cc74_value,
+                    end_value=brightness_value,
+                    duration_ticks=10,
+                    steps=2
+                )
+                for time_offset, msg in cc74_ramp:
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=msg.control,
+                        value=msg.value,
+                        time=time_offset
+                    ))
+            else:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BRIGHTNESS,
+                    value=brightness_value,
+                    time=0
+                ))
+            self.last_cc74_value = brightness_value
         
-        # Add vibrato CC
+        # Add vibrato CC with smooth onset
         if modulation_value > 0:
-            messages.append(mido.Message(
-                'control_change',
-                channel=0,
-                control=SWAMCCMapper.CC_MODULATION,
-                value=modulation_value,
-                time=0
-            ))
+            if self.last_cc1_value == 0:
+                # Starting vibrato from 0 - gradually introduce it
+                cc1_ramp = self.cc_mapper._create_ramp(
+                    cc_number=SWAMCCMapper.CC_MODULATION,
+                    start_value=0,
+                    end_value=modulation_value,
+                    duration_ticks=60,  # Gradual vibrato onset (1/8 note)
+                    steps=4
+                )
+                for time_offset, msg in cc1_ramp:
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=msg.control,
+                        value=msg.value,
+                        time=time_offset
+                    ))
+            else:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_MODULATION,
+                    value=modulation_value,
+                    time=0
+                ))
+            self.last_cc1_value = modulation_value
         
         # Add legato (sustain) for slurred notes
         if note_art.in_slur:
