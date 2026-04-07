@@ -160,7 +160,7 @@ class MusicXMLToSWAM:
             duration_ticks = int(note_art.duration * self.ticks_per_beat)
             
             # Adjust duration for staccato articulations
-            if ArticulationType.STACCATO in note_articulations:
+            if ArticulationType.STACCATO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.5)
             elif ArticulationType.STACCATISSIMO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.25)
@@ -194,17 +194,44 @@ class MusicXMLToSWAM:
         # Base expression from dynamic level
         base_expression = note_art.dynamic_level.cc_value if note_art.dynamic_level else 80
         
-        # Modify based on articulations
+        # Check for staccato first - requires special CC spike pattern
+        if ArticulationType.STACCATO in note_art.articulations:
+            # Use SWAM staccato spike: quick CC11 peak then drop
+            duration_ticks = int(note_art.duration * self.ticks_per_beat)
+            staccato_messages = self.cc_mapper.apply_staccato(
+                base_cc11=base_expression,
+                spike_value=105,  # Spike to 105 for accent
+                duration_ticks=duration_ticks
+            )
+            
+            # Convert to mido messages with proper timing
+            for time_offset, cc_msg in staccato_messages:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=cc_msg.control,
+                    value=cc_msg.value,
+                    time=delta_time if not messages else time_offset
+                ))
+            
+            # Add brightness for more attack
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BRIGHTNESS,
+                value=min(127, 64 + 15),
+                time=0
+            ))
+            
+            return messages
+        
+        # For non-staccato, modify based on articulations
         expression_value = base_expression
         brightness_value = 64
         modulation_value = 0
         
         for art in note_art.articulations:
-            if art == ArticulationType.STACCATO:
-                expression_value = max(20, expression_value - 20)
-                brightness_value = min(127, brightness_value + 15)
-            
-            elif art == ArticulationType.STACCATISSIMO:
+            if art == ArticulationType.STACCATISSIMO:
                 expression_value = max(20, expression_value - 30)
                 brightness_value = min(127, brightness_value + 25)
             
