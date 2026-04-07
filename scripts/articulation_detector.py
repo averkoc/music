@@ -117,6 +117,17 @@ class MusicXMLArticulationDetector:
             if gliss.getFirst():
                 glissando_starts[id(gliss.getFirst())] = gliss
         
+        # Collect vibrato/trill spanners (wavy lines)
+        vibrato_ranges = []  # List of (start_offset, end_offset) tuples
+        for spanner in part.flatten().spanners:
+            spanner_name = spanner.__class__.__name__.lower()
+            # Check for wavy line, trill, or vibrato spanners
+            if any(keyword in spanner_name for keyword in ['wavyline', 'trill', 'tremolo']):
+                if spanner.getFirst() and spanner.getLast():
+                    start_offset = spanner.getFirst().offset
+                    end_offset = spanner.getLast().offset
+                    vibrato_ranges.append((start_offset, end_offset))
+        
         # Iterate through all notes and dynamics
         for element in part.flatten().notesAndRests:
             if isinstance(element, note.Note):
@@ -126,6 +137,12 @@ class MusicXMLArticulationDetector:
                 # Check for glissando starting on this note
                 if id(element) in glissando_starts:
                     articulations.append(ArticulationType.GLISSANDO)
+                
+                # Check if note is within vibrato spanner range
+                for start, end in vibrato_ranges:
+                    if start <= element.offset <= end:
+                        articulations.append(ArticulationType.VIBRATO)
+                        break
                 
                 # Check for dynamic markings on this note
                 dynamic = self._get_dynamic_at_element(element, part)
@@ -143,6 +160,10 @@ class MusicXMLArticulationDetector:
                 
                 # Get expression text
                 expression_text = self._extract_expression_text(element)
+                
+                # Check for vibrato in expression text
+                if expression_text and any(keyword in expression_text.lower() for keyword in ['vibrato', 'vib.', 'vib']):
+                    articulations.append(ArticulationType.VIBRATO)
                 
                 # Create note articulation
                 note_art = NoteArticulation(
@@ -186,6 +207,8 @@ class MusicXMLArticulationDetector:
                 articulations.append(ArticulationType.SPICCATO)
             elif 'detache' in art_name:
                 articulations.append(ArticulationType.DETACHE)
+            elif 'vibrato' in art_name or 'tremolo' in art_name:
+                articulations.append(ArticulationType.VIBRATO)
         
         return articulations
     
