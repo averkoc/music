@@ -66,11 +66,12 @@
           "description": "Gradual decrease in volume"
         },
         "staccato": {
-          "note_duration_percent": 50,
-          "cc11_spike": 105,
+          "note_duration_percent": 35,
+          "cc11_spike": 115,
           "cc11_base_offset": 0,
-          "description": "Short, detached notes with accent",
-          "notes": "Spike CC11 then drop immediately; 50-60% duration is typical"
+          "attack_ticks": 3,
+          "description": "Short, detached notes with sharp attack",
+          "notes": "Sharp CC11 spike with quick decay; 30-40% duration for crisp articulation"
         },
         "legato": {
           "cc64": 127,

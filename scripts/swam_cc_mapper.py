@@ -233,8 +233,8 @@ class SWAMCCMapper:
             time=0
         )))
         
-        # Immediately drop to 0 after brief attack (5-10 ticks)
-        messages.append((5, mido.Message(
+        # Immediately drop to 0 after brief attack (3 ticks for sharp articulation)
+        messages.append((3, mido.Message(
             'control_change',
             channel=self.channel,
             control=self.CC_EXPRESSION,
@@ -243,7 +243,7 @@ class SWAMCCMapper:
         )))
         
         # Restore baseline for next note
-        messages.append((duration_ticks - 5 if duration_ticks > 10 else 5, mido.Message(
+        messages.append((duration_ticks - 3 if duration_ticks > 10 else 5, mido.Message(
             'control_change',
             channel=self.channel,
             control=self.CC_EXPRESSION,

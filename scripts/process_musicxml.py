@@ -161,9 +161,9 @@ class MusicXMLToSWAM:
             
             # Adjust duration for staccato articulations
             if ArticulationType.STACCATO in note_art.articulations:
-                duration_ticks = int(duration_ticks * 0.5)
+                duration_ticks = int(duration_ticks * 0.35)  # 35% for crisp staccato
             elif ArticulationType.STACCATISSIMO in note_art.articulations:
-                duration_ticks = int(duration_ticks * 0.25)
+                duration_ticks = int(duration_ticks * 0.20)  # 20% for very short notes
             
             # Add note off
             track.append(mido.Message(
@@ -200,7 +200,7 @@ class MusicXMLToSWAM:
             duration_ticks = int(note_art.duration * self.ticks_per_beat)
             staccato_messages = self.cc_mapper.apply_staccato(
                 base_cc11=base_expression,
-                spike_value=105,  # Spike to 105 for accent
+                spike_value=115,  # Sharp spike to 115 for crisp attack
                 duration_ticks=duration_ticks
             )
             
