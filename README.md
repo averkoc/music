@@ -53,8 +53,8 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/musescore-to-swam.git
-cd musescore-to-swam
+git clone https://github.com/yourusername/music.git
+cd music
 ```
 
 2. Install Python dependencies:

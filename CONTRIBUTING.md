@@ -54,8 +54,8 @@ Feature requests are welcome! Please include:
 
 ```bash
 # Clone your fork
-git clone https://github.com/your-username/musescore-to-swam.git
-cd musescore-to-swam
+git clone https://github.com/your-username/music.git
+cd music
 
 # Install development dependencies
 pip install -r requirements.txt
