@@ -27,6 +27,14 @@ Some MuseScore versions support vibrato as an articulation:
 
 **Detection**: Checks articulation class names for "vibrato" or "tremolo"
 
+### Technical Note: MuseScore SMuFL Vibrato Symbols
+
+MuseScore exports vibrato articulation marks using SMuFL (Standard Music Font Layout) symbols like `wiggleVibratoLargeSlowest` in MusicXML's `<other-articulation>` element. The music21 library parses these as generic `Articulation` objects without preserving the SMuFL symbol name.
+
+**Workaround**: The converter detects all generic `Articulation` objects (those without specific subclass types) as vibrato. This works correctly for typical MuseScore files where custom articulations are primarily vibrato marks.
+
+If you use other custom articulations that shouldn't be vibrato, prefer the wavy line method instead.
+
 ## How the Converter Handles Vibrato
 
 When vibrato is detected, the converter:
