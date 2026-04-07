@@ -81,7 +81,37 @@ messages = mapper.create_exponential_crescendo(
 
 ---
 
-### 3. Vibrato Mark
+### 4. Glissando
+
+**Musical Symbol**: Glissando line between notes  
+**Effect**: Continuous pitch slide from one note to another
+
+**MIDI Implementation**:
+```json
+{
+  "cc5_portamento": 110,
+  "cc64": 127,
+  "note_overlap": true,
+  "overlap_percent": 50
+}
+```
+
+**Reasoning**:
+- **CC5 (Portamento)**: Very high value (110) for dramatic, obvious pitch slide
+- **CC64 (Sustain)**: Enables legato mode for continuous sound
+- **Note Overlap**: **CRITICAL** - The glissando note MUST overlap with the next note for SWAM to produce the pitch glide
+- **50% Overlap**: Long overlap ensures the slide is clearly audible and smooth
+- **How SWAM Glissando Works**: The pitch glide occurs when two notes overlap while CC5 is active - the first note slides into the second
+
+**Key Distinction from Slur**:
+- **Slur**: Subtle slide, shorter overlap (10-15%), moderate portamento (CC5 = 40)
+- **Glissando**: Dramatic slide, longer overlap (50%), very high portamento (CC5 = 110)
+
+**Implementation Note**: After the glissando note ends, CC5 is reset to 0 to prevent affecting subsequent notes.
+
+---
+
+### 5. Vibrato Mark
 
 **Musical Symbol**: Wavy line above notes (~~~~)  
 **Effect**: Pitch oscillation that develops after note onset
@@ -109,7 +139,7 @@ At 120 BPM: (500ms / 500ms) × 480 = 480 ticks (1 beat)
 
 ---
 
-### 4. Staccato (.)
+### 6. Staccato (.)
 
 **Musical Symbol**: Dot above note  
 **Effect**: Short, detached note with emphasized attack

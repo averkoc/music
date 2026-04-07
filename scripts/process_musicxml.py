@@ -142,10 +142,38 @@ class MusicXMLToSWAM:
         
         # Process each note with articulation-specific CC messages
         current_time = 0
+        note_off_queue = []  # Track delayed note-offs for overlapping notes
         
         for i, note_art in enumerate(note_articulations):
             # Calculate delta time
             note_time_ticks = int(note_art.onset_time * self.ticks_per_beat)
+            delta_time = note_time_ticks - current_time
+            
+            # Process any queued note-offs that should happen before this note
+            while note_off_queue and note_off_queue[0][0] <= note_time_ticks:
+                off_time, off_note, off_has_gliss = note_off_queue.pop(0)
+                time_from_current = off_time - current_time
+                
+                # Add note off
+                track.append(mido.Message(
+                    'note_off',
+                    note=off_note,
+                    velocity=0,
+                    time=time_from_current
+                ))
+                current_time = off_time
+                
+                # Reset portamento after glissando
+                if off_has_gliss:
+                    track.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_PORTAMENTO,
+                        value=0,
+                        time=0
+                    ))
+            
+            # Recalculate delta time after processing note-offs
             delta_time = note_time_ticks - current_time
             
             # Add CC messages for this note based on articulation
@@ -160,24 +188,48 @@ class MusicXMLToSWAM:
                 time=0 if cc_messages else delta_time
             ))
             
+            current_time = note_time_ticks
+            
             # Calculate note off time
             duration_ticks = int(note_art.duration * self.ticks_per_beat)
+            has_glissando = ArticulationType.GLISSANDO in note_art.articulations
             
-            # Adjust duration for staccato articulations
-            if ArticulationType.STACCATO in note_art.articulations:
+            # Adjust duration for articulations
+            if has_glissando:
+                # Extend note to overlap with next note for glissando
+                if i + 1 < len(note_articulations):
+                    next_note_time = int(note_articulations[i + 1].onset_time * self.ticks_per_beat)
+                    # Extend to overlap by 50% for more dramatic glissando slide
+                    overlap_amount = int((next_note_time - note_time_ticks) * 0.5)
+                    duration_ticks = (next_note_time - note_time_ticks) + overlap_amount
+            elif ArticulationType.STACCATO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.35)  # 35% for integrated rhythmic flow
             elif ArticulationType.STACCATISSIMO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.20)  # 20% for very short notes
             
-            # Add note off
+            # Queue the note off
+            note_off_time = note_time_ticks + duration_ticks
+            note_off_queue.append((note_off_time, note_art.pitch, has_glissando))
+        
+        # Process any remaining note-offs
+        for off_time, off_note, off_has_gliss in note_off_queue:
+            time_from_current = off_time - current_time
             track.append(mido.Message(
                 'note_off',
-                note=note_art.pitch,
+                note=off_note,
                 velocity=0,
-                time=duration_ticks
+                time=time_from_current
             ))
+            current_time = off_time
             
-            current_time = note_time_ticks + duration_ticks
+            if off_has_gliss:
+                track.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_PORTAMENTO,
+                    value=0,
+                    time=0
+                ))
         
         # Add dynamic changes (crescendo/diminuendo)
         self._add_dynamic_changes(track, dynamic_changes)
@@ -197,6 +249,38 @@ class MusicXMLToSWAM:
         
         # Base expression from dynamic level
         base_expression = note_art.dynamic_level.cc_value if note_art.dynamic_level else 80
+        
+        # Check for glissando - requires high portamento CC5
+        if ArticulationType.GLISSANDO in note_art.articulations:
+            # Set very high portamento for dramatic pitch slide
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_PORTAMENTO,
+                value=110,  # Very high portamento for obvious glissando (was 80)
+                time=delta_time
+            ))
+            
+            # Enable legato for smooth slide
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_SUSTAIN,
+                value=127,
+                time=0
+            ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            self.last_cc11_value = base_expression
+            return messages
         
         # Check for staccato first - requires special CC spike pattern
         if ArticulationType.STACCATO in note_art.articulations:

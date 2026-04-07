@@ -88,6 +88,9 @@ class ArticulationMapper:
         elif articulation_type == ArticulationType.DIMINUENDO:
             messages = self._apply_diminuendo(base_cc11, note_duration_ticks)
         
+        elif articulation_type == ArticulationType.GLISSANDO:
+            messages = self._apply_glissando()
+        
         return messages
     
     def _apply_staccato(
@@ -187,6 +190,28 @@ class ArticulationMapper:
             channel=self.mapper.channel,
             control=self.mapper.CC_EXPRESSION,
             value=base_cc11,
+            time=0
+        )))
+        
+        return messages
+    
+    def _apply_glissando(self) -> List[Tuple[int, mido.Message]]:
+        """Apply glissando (pitch slide) from config."""
+        config = self.articulation_config.get('glissando', {})
+        portamento = config.get('cc5_portamento', 80)
+        
+        messages = []
+        
+        # Set high portamento for noticeable pitch slide
+        msg = self.mapper.apply_portamento(amount=portamento, time=0)
+        messages.append((0, msg))
+        
+        # Enable legato for smooth glide
+        messages.append((0, mido.Message(
+            'control_change',
+            channel=self.mapper.channel,
+            control=self.mapper.CC_SUSTAIN,
+            value=127,
             time=0
         )))
         

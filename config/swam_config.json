@@ -128,6 +128,14 @@
           "note_duration_percent": 40,
           "cc74": 80,
           "description": "Bouncing bow stroke"
+        },
+        "glissando": {
+          "cc5_portamento": 110,
+          "cc64": 127,
+          "note_overlap": true,
+          "overlap_percent": 50,
+          "description": "Continuous pitch slide between notes",
+          "notes": "Very high portamento (110) + 50% overlap for dramatic glide effect"
         }
       },
       "dynamics": {
@@ -241,6 +249,15 @@
           "cc18_range": [40, 100],
           "description": "Jazz growl effect",
           "notes": "CC18 adds harmonic distortion; use sparingly"
+        },
+        "glissando": {
+          "cc5_portamento": 100,
+          "cc64": 127,
+          "note_overlap": true,
+          "overlap_percent": 50,
+          "cc2_constant": 85,
+          "description": "Pitch slide with continuous air flow",
+          "notes": "High portamento (100) + 50% overlap for clear glissando"
         }
       },
       "dynamics": {

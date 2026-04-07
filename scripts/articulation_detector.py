@@ -28,6 +28,7 @@ class ArticulationType(Enum):
     SUL_PONTICELLO = "sul-ponticello"
     SUL_TASTO = "sul-tasto"
     PORTAMENTO = "portamento"
+    GLISSANDO = "glissando"
 
 
 class DynamicLevel(Enum):
@@ -110,11 +111,21 @@ class MusicXMLArticulationDetector:
         in_slur = False
         slur_start_dynamic = self.current_dynamic
         
+        # Collect glissando spanners
+        glissando_starts = {}  # Maps note object to glissando spanner
+        for gliss in part.flatten().getElementsByClass('Glissando'):
+            if gliss.getFirst():
+                glissando_starts[id(gliss.getFirst())] = gliss
+        
         # Iterate through all notes and dynamics
         for element in part.flatten().notesAndRests:
             if isinstance(element, note.Note):
                 # Extract articulations
                 articulations = self._extract_articulations(element)
+                
+                # Check for glissando starting on this note
+                if id(element) in glissando_starts:
+                    articulations.append(ArticulationType.GLISSANDO)
                 
                 # Check for dynamic markings on this note
                 dynamic = self._get_dynamic_at_element(element, part)
