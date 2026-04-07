@@ -48,6 +48,60 @@ class SWAMCCMapper:
         self.instrument = instrument
         self.channel = 0  # Default MIDI channel
     
+    def _create_ramp(
+        self,
+        cc_number: int,
+        start_value: int,
+        end_value: int,
+        duration_ticks: int,
+        steps: int = 3
+    ) -> List[Tuple[int, mido.Message]]:
+        """
+        Create a smooth ramp between two CC values for human-like transitions.
+        
+        Args:
+            cc_number: MIDI CC number to ramp
+            start_value: Starting CC value
+            end_value: Target CC value
+            duration_ticks: Duration of ramp in ticks
+            steps: Number of interpolation steps (default 3 for subtle smoothing)
+            
+        Returns:
+            List of (time_offset, message) tuples
+        """
+        messages = []
+        
+        if steps <= 1:
+            # No interpolation, just immediate change
+            messages.append((0, mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=cc_number,
+                value=end_value,
+                time=0
+            )))
+            return messages
+        
+        # Calculate step size for time and value
+        time_step = duration_ticks // steps
+        value_diff = end_value - start_value
+        
+        for i in range(steps):
+            # Linear interpolation
+            progress = (i + 1) / steps
+            interpolated_value = int(start_value + (value_diff * progress))
+            time_offset = time_step * i
+            
+            messages.append((time_offset, mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=cc_number,
+                value=interpolated_value,
+                time=0
+            )))
+        
+        return messages
+    
     def velocity_to_expression(
         self, 
         velocity: int, 
@@ -212,7 +266,7 @@ class SWAMCCMapper:
         duration_ticks: int = 0
     ) -> List[Tuple[int, mido.Message]]:
         """
-        Apply staccato articulation: spike CC11 then immediately drop.
+        Apply staccato articulation: ramp up to spike then decay with sustain.
         
         Args:
             base_cc11: Baseline expression value to return to
@@ -224,28 +278,32 @@ class SWAMCCMapper:
         """
         messages = []
         
-        # Spike CC11 at note onset
-        messages.append((0, mido.Message(
-            'control_change',
-            channel=self.channel,
-            control=self.CC_EXPRESSION,
-            value=spike_value,
-            time=0
-        )))
+        # Quick ramp up to spike (2 steps over 2 ticks for natural attack)
+        ramp_up = self._create_ramp(
+            cc_number=self.CC_EXPRESSION,
+            start_value=base_cc11,
+            end_value=spike_value,
+            duration_ticks=2,
+            steps=2
+        )
+        messages.extend(ramp_up)
         
-        # Immediately drop to sustain level (not 0) after brief attack (3 ticks for sharp articulation)
-        # Keep 40% of base level to maintain rhythmic flow in staccato passages
+        # Quick decay to sustain level (3 steps over 4 ticks)
         sustain_level = max(20, int(base_cc11 * 0.4))
-        messages.append((3, mido.Message(
-            'control_change',
-            channel=self.channel,
-            control=self.CC_EXPRESSION,
-            value=sustain_level,
-            time=0
-        )))
+        ramp_down = self._create_ramp(
+            cc_number=self.CC_EXPRESSION,
+            start_value=spike_value,
+            end_value=sustain_level,
+            duration_ticks=4,
+            steps=3
+        )
+        # Offset by the ramp up duration
+        for time_offset, msg in ramp_down:
+            messages.append((time_offset + 2, msg))
         
-        # Restore baseline for next note
-        messages.append((duration_ticks - 3 if duration_ticks > 10 else 5, mido.Message(
+        # Restore baseline for next note (gradual)
+        restore_time = duration_ticks - 6 if duration_ticks > 10 else 5
+        messages.append((restore_time, mido.Message(
             'control_change',
             channel=self.channel,
             control=self.CC_EXPRESSION,
@@ -262,7 +320,7 @@ class SWAMCCMapper:
         sustain_value: int = None
     ) -> List[Tuple[int, mido.Message]]:
         """
-        Apply accent articulation: spike CC11 then sustain at normal level.
+        Apply accent articulation: smooth ramp to peak then decay to sustain.
         
         Args:
             base_cc11: Baseline expression value
@@ -275,23 +333,26 @@ class SWAMCCMapper:
         messages = []
         sustain = sustain_value if sustain_value is not None else base_cc11
         
-        # Sharp attack spike
-        messages.append((0, mido.Message(
-            'control_change',
-            channel=self.channel,
-            control=self.CC_EXPRESSION,
-            value=peak_value,
-            time=0
-        )))
+        # Smooth ramp up to peak (3 steps over 6 ticks)
+        ramp_up = self._create_ramp(
+            cc_number=self.CC_EXPRESSION,
+            start_value=base_cc11,
+            end_value=peak_value,
+            duration_ticks=6,
+            steps=3
+        )
+        messages.extend(ramp_up)
         
-        # Quick decay to sustained level (10 ticks)
-        messages.append((10, mido.Message(
-            'control_change',
-            channel=self.channel,
-            control=self.CC_EXPRESSION,
-            value=sustain,
-            time=0
-        )))
+        # Quick decay to sustained level (2 steps over 4 ticks)
+        ramp_down = self._create_ramp(
+            cc_number=self.CC_EXPRESSION,
+            start_value=peak_value,
+            end_value=sustain,
+            duration_ticks=4,
+            steps=2
+        )
+        for time_offset, msg in ramp_down:
+            messages.append((time_offset + 6, msg))
         
         return messages
     
@@ -302,7 +363,7 @@ class SWAMCCMapper:
         sustain_value: int = None
     ) -> List[Tuple[int, mido.Message]]:
         """
-        Apply marcato articulation: very strong spike then sustain.
+        Apply marcato articulation: strong ramp to peak then decay to sustain.
         
         Args:
             base_cc11: Baseline expression value
@@ -315,23 +376,26 @@ class SWAMCCMapper:
         messages = []
         sustain = sustain_value if sustain_value is not None else base_cc11
         
-        # Very strong attack spike
-        messages.append((0, mido.Message(
-            'control_change',
-            channel=self.channel,
-            control=self.CC_EXPRESSION,
-            value=peak_value,
-            time=0
-        )))
+        # Strong ramp up to very high peak (4 steps over 8 ticks)
+        ramp_up = self._create_ramp(
+            cc_number=self.CC_EXPRESSION,
+            start_value=base_cc11,
+            end_value=peak_value,
+            duration_ticks=8,
+            steps=4
+        )
+        messages.extend(ramp_up)
         
-        # Slightly slower decay than accent (15 ticks)
-        messages.append((15, mido.Message(
-            'control_change',
-            channel=self.channel,
-            control=self.CC_EXPRESSION,
-            value=sustain,
-            time=0
-        )))
+        # Slightly longer decay (3 steps over 7 ticks)
+        ramp_down = self._create_ramp(
+            cc_number=self.CC_EXPRESSION,
+            start_value=peak_value,
+            end_value=sustain,
+            duration_ticks=7,
+            steps=3
+        )
+        for time_offset, msg in ramp_down:
+            messages.append((time_offset + 8, msg))
         
         return messages
     

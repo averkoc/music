@@ -69,9 +69,10 @@
           "note_duration_percent": 35,
           "cc11_spike": 115,
           "cc11_sustain_percent": 40,
-          "attack_ticks": 3,
-          "description": "Short, detached notes with sharp attack and rhythmic flow",
-          "notes": "Sharp CC11 spike with decay to 40% sustain; 35% duration for integrated staccato passages"
+          "attack_ticks": 2,
+          "decay_ticks": 4,
+          "description": "Short, detached notes with smooth attack and rhythmic flow",
+          "notes": "Smooth ramp to CC11 spike, gradual decay to 40% sustain for human-like bow articulation"
         },
         "legato": {
           "cc64": 127,
@@ -99,16 +100,18 @@
         "accent": {
           "cc11_peak": 110,
           "cc74_brightness": 20,
-          "attack_decay_ticks": 10,
+          "attack_ramp_ticks": 6,
+          "decay_ramp_ticks": 4,
           "velocity_boost": 20,
-          "description": "Emphasized note attack with spike then sustain"
+          "description": "Emphasized note attack with gradual ramp for natural expression"
         },
         "marcato": {
           "cc11_peak": 120,
           "cc74_brightness": 25,
-          "attack_decay_ticks": 15,
+          "attack_ramp_ticks": 8,
+          "decay_ramp_ticks": 7,
           "velocity_boost": 25,
-          "description": "Very strong accent with heavy attack"
+          "description": "Very strong accent with smooth ramp to heavy attack"
         },
         "sul_ponticello": {
           "cc9_value": 115,
