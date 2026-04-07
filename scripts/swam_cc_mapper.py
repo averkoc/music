@@ -233,12 +233,14 @@ class SWAMCCMapper:
             time=0
         )))
         
-        # Immediately drop to 0 after brief attack (3 ticks for sharp articulation)
+        # Immediately drop to sustain level (not 0) after brief attack (3 ticks for sharp articulation)
+        # Keep 40% of base level to maintain rhythmic flow in staccato passages
+        sustain_level = max(20, int(base_cc11 * 0.4))
         messages.append((3, mido.Message(
             'control_change',
             channel=self.channel,
             control=self.CC_EXPRESSION,
-            value=0,
+            value=sustain_level,
             time=0
         )))
         

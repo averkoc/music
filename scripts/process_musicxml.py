@@ -161,7 +161,7 @@ class MusicXMLToSWAM:
             
             # Adjust duration for staccato articulations
             if ArticulationType.STACCATO in note_art.articulations:
-                duration_ticks = int(duration_ticks * 0.25)  # 25% for beat-like precision
+                duration_ticks = int(duration_ticks * 0.35)  # 35% for integrated rhythmic flow
             elif ArticulationType.STACCATISSIMO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.20)  # 20% for very short notes
             
