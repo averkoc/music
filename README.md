@@ -174,9 +174,7 @@ For detailed workflow information, see [Workflow Guide](docs/workflow_guide.md).
 
 ## Contributing
 
-Interested in contributing? Please contact the project owner for collaboration opportunities.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for technical details.
+Contributions and suggestions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 Areas for development:
 - Additional SWAM instrument support (cello, trumpet, etc.)
@@ -186,11 +184,9 @@ Areas for development:
 
 ## License
 
-Copyright (c) 2026 averkoc. All Rights Reserved.
+Copyright (c) 2026 averkoc. All rights reserved.
 
-This is proprietary software. See [LICENSE](LICENSE) file for details.
-
-For licensing inquiries, please contact the copyright holder.
+See [LICENSE](LICENSE) file for details.
 
 ## Resources
 
