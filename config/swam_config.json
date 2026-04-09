@@ -12,21 +12,74 @@
         "expression": {
           "cc": 11,
           "description": "Overall expression/dynamics",
-          "range": [20, 127],
-          "default": 80
+          "range": [0, 127],
+          "default": 80,
+          "curve": {
+            "shape": 0.04,
+            "symmetry": 0.8
+          },
+          "notes": "Exponential curve for natural dynamics"
         },
-        "modulation": {
+        "vibrato_depth": {
           "cc": 1,
-          "description": "Vibrato depth and speed",
-          "range": [0, 127],
+          "description": "Vibrato depth",
+          "range": [0, 110],
           "default": 0,
-          "notes": "0 = no vibrato, 64 = moderate, 127 = intense"
+          "notes": "0 = no vibrato, 55 = moderate, 110 = intense (capped at 110)"
         },
-        "brightness": {
-          "cc": 74,
-          "description": "Tone brightness/timbre",
+        "vibrato_rate": {
+          "cc": 17,
+          "description": "Vibrato rate/speed",
           "range": [0, 127],
-          "default": 64
+          "default": 64,
+          "notes": "Controls vibrato speed independently from depth"
+        },
+        "portamento_time": {
+          "cc": 5,
+          "description": "Slide time between notes",
+          "range": [1, 127],
+          "default": 1,
+          "notes": "Minimum value is 1, not 0"
+        },
+        "bow_force": {
+          "cc": 20,
+          "description": "Bow pressure/force",
+          "range": [0, 127],
+          "default": 64,
+          "notes": "Controls bow pressure on strings"
+        },
+        "bow_position": {
+          "cc": 21,
+          "description": "Bow position on string",
+          "range": [0, 127],
+          "default": 64,
+          "notes": "0 = sul tasto (fingerboard), 64 = normal, 127 = sul ponticello (bridge)"
+        },
+        "main_volume": {
+          "cc": 7,
+          "description": "Main volume",
+          "range": [0, 127],
+          "default": 100
+        },
+        "pan": {
+          "cc": 10,
+          "description": "Pan position",
+          "range": [0, 127],
+          "default": 64,
+          "notes": "0 = hard left, 64 = center, 127 = hard right"
+        },
+        "reverb": {
+          "cc": 90,
+          "description": "Reverb send level",
+          "range": [0, 127],
+          "default": 40
+        },
+        "attack_ramp_time": {
+          "cc": 80,
+          "description": "Attack ramp time",
+          "range": [0, 127],
+          "default": 64,
+          "notes": "Controls the smoothness of note onset"
         },
         "sustain": {
           "cc": 64,
@@ -36,22 +89,98 @@
             "off": 0,
             "on": 127
           },
+          "curve": {
+            "shape": 0.99
+          },
           "notes": "Use for legato passages"
         },
-        "portamento_time": {
-          "cc": 5,
-          "description": "Slide time between notes",
+        "harmonics": {
+          "cc": 74,
+          "description": "Harmonics (brightness/brilliance)",
           "range": [0, 127],
-          "default": 0
-        },
-        "reverb": {
-          "cc": 91,
-          "description": "Reverb send level",
-          "range": [0, 127],
-          "default": 40
+          "default": 64,
+          "notes": "Custom mapping - adds harmonic content for brilliant tone"
         }
       },
+      "envelopes": {
+        "_notes": [
+          "CC11 envelopes prevent flat/dead sound - EVERY note should have dynamic shaping",
+          "Envelope points are (time_ratio, cc11_ratio) where ratios are 0.0-1.0",
+          "time_ratio: 0.0=note start, 1.0=note end",
+          "cc11_ratio: relative to base expression (1.0=base, 1.2=20% above base)"
+        ],
+        "default": {
+          "type": "default",
+          "description": "Standard envelope for most notes - natural attack and release",
+          "notes": "Use for unmarked notes, quarter notes, half notes",
+          "enabled_by_default": true,
+          "points": [
+            [0.0, 0.7],
+            [0.15, 1.0],
+            [0.7, 1.0],
+            [1.0, 0.85]
+          ]
+        },
+        "expressive": {
+          "type": "expressive",
+          "description": "Dynamic envelope with swell for expressive passages",
+          "notes": "Use for slow melodies, cantabile phrases, emotional moments",
+          "points": [
+            [0.0, 0.6],
+            [0.2, 1.1],
+            [0.5, 1.05],
+            [0.8, 1.0],
+            [1.0, 0.8]
+          ]
+        },
+        "gentle": {
+          "type": "gentle",
+          "description": "Soft, delicate envelope for quiet passages",
+          "notes": "Use for pp/ppp, delicate phrases, sul tasto",
+          "points": [
+            [0.0, 0.75],
+            [0.25, 0.95],
+            [0.8, 0.9],
+            [1.0, 0.7]
+          ]
+        },
+        "percussive": {
+          "type": "percussive",
+          "description": "Sharp attack with fast decay for articulated notes",
+          "notes": "Use for spiccato, détaché, rhythmic passages",
+          "points": [
+            [0.0, 0.8],
+            [0.08, 1.15],
+            [0.2, 0.85],
+            [0.6, 0.75],
+            [1.0, 0.6]
+          ]
+        }
+      },
+      "portamento": {
+        "_notes": [
+          "Interval-aware portamento adds musical intelligence",
+          "Small intervals = subtle slide, large leaps = expressive slide",
+          "base_amount scales all portamento (0-127)"
+        ],
+        "enabled": true,
+        "base_amount": 60,
+        "interval_scaling": {
+          "unison": 0.0,
+          "half_step": 0.1,
+          "whole_step": 0.2,
+          "third": 0.35,
+          "fourth_fifth": 0.5,
+          "octave": 0.7,
+          "large_leap": 0.9
+        },
+        "description": "Automatic portamento based on melodic intervals"
+      },
       "articulations": {
+        "_notes": [
+          "IMPORTANT: Disable SWAM's internal auto-vibrato when using vibrato_mark or default_vibrato",
+          "Both active simultaneously will fight each other and create pitch artifacts"
+        ],
         "crescendo": {
           "cc": 11,
           "ramp_type": "exponential",
@@ -67,31 +196,34 @@
         },
         "staccato": {
           "note_duration_percent": 35,
+          "note_off_velocity": 110,
           "cc11_spike": 115,
           "cc11_sustain_percent": 40,
           "attack_ticks": 2,
           "decay_ticks": 4,
           "description": "Short, detached notes with smooth attack and rhythmic flow",
-          "notes": "Smooth ramp to CC11 spike, gradual decay to 40% sustain for human-like bow articulation"
+          "notes": "High note-off velocity (110) creates sharp bow stop. Smooth ramp to CC11 spike, gradual decay to 40% sustain for human-like bow articulation"
         },
         "legato": {
           "cc64": 127,
           "cc68": 127,
           "note_overlap": true,
           "overlap_percent": 10,
+          "note_off_velocity": 30,
           "description": "Smooth, connected notes",
-          "notes": "CC64=sustain, CC68=legato switch (if supported)"
+          "notes": "Low note-off velocity (30) for smooth bow lift. CC64=sustain, CC68=legato switch (if supported)"
         },
         "slur": {
           "cc5_portamento": 40,
           "cc64": 127,
           "note_overlap": true,
           "overlap_percent": 15,
+          "note_off_velocity": 20,
           "description": "Legato with slide between notes",
-          "notes": "Higher overlap and portamento for smooth glide"
+          "notes": "Very low note-off velocity (20) for seamless bow connection. Higher overlap and portamento for smooth glide"
         },
         "vibrato_mark": {
-          "cc1_target": 45,
+          "cc1_target": 65,
           "cc17_target": 67,
           "delay_ms": 200,
           "ramp_duration_ms": 150,
@@ -99,18 +231,18 @@
             "enabled": true,
             "low_notes": {
               "threshold": "D4",
-              "cc1_depth": 50,
+              "cc1_depth": 70,
               "cc17_rate": 60,
               "description": "Wider, slower vibrato on G/D strings"
             },
             "high_notes": {
               "threshold": "D5",
-              "cc1_depth": 40,
+              "cc1_depth": 55,
               "cc17_rate": 75,
               "description": "Narrower, faster vibrato on A/E strings"
             },
             "mid_notes": {
-              "cc1_depth": 45,
+              "cc1_depth": 65,
               "cc17_rate": 67,
               "description": "Balanced vibrato for middle register"
             }
@@ -166,35 +298,38 @@
         },
         "accent": {
           "cc11_peak": 110,
-          "cc74_brightness": 20,
+          "cc74_harmonics": 20,
           "attack_ramp_ticks": 6,
           "decay_ramp_ticks": 4,
           "velocity_boost": 20,
+          "note_off_velocity": 80,
           "description": "Emphasized note attack with gradual ramp for natural expression"
         },
         "marcato": {
           "cc11_peak": 120,
-          "cc74_brightness": 25,
+          "cc74_harmonics": 25,
           "attack_ramp_ticks": 8,
           "decay_ramp_ticks": 7,
           "velocity_boost": 25,
+          "note_off_velocity": 90,
           "description": "Very strong accent with smooth ramp to heavy attack"
         },
         "sul_ponticello": {
-          "cc9_value": 115,
-          "cc9_range": [110, 127],
+          "cc21_value": 115,
+          "cc21_range": [110, 127],
           "description": "Bow position near bridge (bright, metallic)",
-          "notes": "CC9 controls bow position; higher = closer to bridge"
+          "notes": "CC21 controls bow position; higher = closer to bridge"
         },
         "sul_tasto": {
-          "cc9_value": 15,
-          "cc9_range": [0, 20],
-          "description": "Bow position over fingerboard (soft, dark)"
+          "cc21_value": 15,
+          "cc21_range": [0, 20],
+          "description": "Bow position over fingerboard (soft, dark)",
+          "notes": "CC21 controls bow position; lower = over fingerboard"
         },
         "spiccato": {
           "note_duration_percent": 40,
-          "cc74": 80,
-          "description": "Bouncing bow stroke"
+          "cc74_harmonics": 80,
+          "description": "Bouncing bow stroke with added harmonics"
         },
         "glissando": {
           "cc5_portamento": 110,

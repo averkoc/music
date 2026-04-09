@@ -69,8 +69,13 @@ class MusicXMLToSWAM:
         
         # Track last CC values for smooth transitions
         self.last_cc11_value = 80  # Expression
-        self.last_cc74_value = 64  # Brightness
+        self.last_cc74_value = 64  # Harmonics
         self.last_cc1_value = 0    # Modulation/vibrato
+        self.last_cc20_value = 64  # Bow Force
+        self.last_cc21_value = 64  # Bow Position
+        
+        # Track previous pitch for Phase 1 interval-aware portamento
+        self.prev_pitch = None
     
     def process_file(
         self,
@@ -162,7 +167,7 @@ class MusicXMLToSWAM:
         
         # Process each note with articulation-specific CC messages
         current_time = 0
-        note_off_queue = []  # Track delayed note-offs for overlapping notes
+        note_off_queue = []  # Track delayed note-offs: (time, note, has_gliss, note_off_velocity)
         total_notes = len(note_articulations)
         tempo_bpm = mido.tempo2bpm(tempo)
         
@@ -184,16 +189,16 @@ class MusicXMLToSWAM:
             
             # Process any queued note-offs that should happen before this note
             while note_off_queue and note_off_queue[0][0] <= note_time_ticks:
-                off_time, off_note, off_has_gliss = note_off_queue.pop(0)
+                off_time, off_note, off_has_gliss, off_velocity = note_off_queue.pop(0)
                 # Ensure note-off doesn't go backwards
                 off_time = max(current_time, off_time)
                 time_from_current = off_time - current_time
                 
-                # Add note off
+                # Add note off with articulation-specific velocity
                 track.append(mido.Message(
                     'note_off',
                     note=off_note,
-                    velocity=0,
+                    velocity=off_velocity,  # Use articulation-specific velocity
                     time=time_from_current
                 ))
                 current_time = off_time
@@ -212,15 +217,29 @@ class MusicXMLToSWAM:
             delta_time = max(0, note_time_ticks - current_time)
             
             # Add CC messages for this note based on articulation
+            # Pass previous pitch for Phase 1 portamento
             cc_messages = self._generate_cc_for_note(note_art, delta_time, i, total_notes)
-            track.extend(cc_messages)
+            
+            # Send CC messages just before note-on (at same tick, processed first by MIDI spec)
+            # All CCs have time=0 except first which gets the delta_time
+            if cc_messages:
+                # First CC gets all the delta time
+                cc_messages[0].time = delta_time
+                # All other CCs happen at time=0 (same tick, but ordered before note-on)
+                for i_cc in range(1, len(cc_messages)):
+                    cc_messages[i_cc].time = 0
+                
+                track.extend(cc_messages)
+            
+            # Update previous pitch for next note (Phase 1 portamento)
+            self.prev_pitch = note_art.pitch
             
             # Apply humanization to velocity if enabled
             velocity = note_art.velocity
             if self.humanizer:
                 velocity = self.humanizer.humanize_velocity(velocity)
             
-            # Add note on
+            # Add note on at time=0 (same tick as CCs, but after them in message order)
             track.append(mido.Message(
                 'note_on',
                 note=note_art.pitch,
@@ -258,19 +277,37 @@ class MusicXMLToSWAM:
             if self.humanizer and not has_glissando:  # Don't humanize glissando timing
                 duration_ticks = self.humanizer.humanize_duration(duration_ticks)
             
-            # Queue the note off
+            # Determine note-off velocity based on articulation (for KeyLab mk3 and physical modeling)
+            note_off_velocity = 64  # Default medium bow lift
+            
+            if ArticulationType.STACCATO in note_art.articulations:
+                note_off_velocity = 110  # Sharp bow stop
+            elif ArticulationType.STACCATISSIMO in note_art.articulations:
+                note_off_velocity = 120  # Very sharp bow stop
+            elif ArticulationType.MARCATO in note_art.articulations:
+                note_off_velocity = 90  # Emphasized release
+            elif ArticulationType.ACCENT in note_art.articulations or ArticulationType.STRONG_ACCENT in note_art.articulations:
+                note_off_velocity = 80  # Moderate bow stop
+            elif note_art.in_slur:
+                note_off_velocity = 20  # Very smooth bow connection
+            elif ArticulationType.TENUTO in note_art.articulations:
+                note_off_velocity = 30  # Gentle bow lift
+            elif has_glissando:
+                note_off_velocity = 10  # Seamless slide (bow stays on string)
+            
+            # Queue the note off with velocity
             note_off_time = note_time_ticks + duration_ticks
-            note_off_queue.append((note_off_time, note_art.pitch, has_glissando))
+            note_off_queue.append((note_off_time, note_art.pitch, has_glissando, note_off_velocity))
         
         # Process any remaining note-offs
-        for off_time, off_note, off_has_gliss in note_off_queue:
+        for off_time, off_note, off_has_gliss, off_velocity in note_off_queue:
             # Ensure note-off doesn't go backwards
             off_time = max(current_time, off_time)
             time_from_current = off_time - current_time
             track.append(mido.Message(
                 'note_off',
                 note=off_note,
-                velocity=0,
+                velocity=off_velocity,  # Use articulation-specific velocity
                 time=time_from_current
             ))
             current_time = off_time
@@ -338,6 +375,16 @@ class MusicXMLToSWAM:
                 time=0
             ))
             
+            # Add coupled CC2 (bow pressure)
+            cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
             self.last_cc11_value = base_expression
             return messages
         
@@ -356,6 +403,15 @@ class MusicXMLToSWAM:
                     control=SWAMCCMapper.CC_EXPRESSION,
                     value=base_expression,
                     time=delta_time
+                ))
+                # Add coupled CC2
+                cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BREATH,
+                    value=cc2_value,
+                    time=0
                 ))
                 self.last_cc11_value = base_expression
                 return messages
@@ -430,6 +486,16 @@ class MusicXMLToSWAM:
                 channel=0,
                 control=SWAMCCMapper.CC_EXPRESSION,
                 value=base_expression,
+                time=0
+            ))
+            
+            # Add coupled CC2 (bow pressure)
+            cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
                 time=0
             ))
             
@@ -517,6 +583,16 @@ class MusicXMLToSWAM:
                         time=0
                     ))
                     
+                    # Add coupled CC2 (bow pressure)
+                    cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_BREATH,
+                        value=cc2_value,
+                        time=0
+                    ))
+                    
                     self.last_cc11_value = base_expression
                     self.last_cc1_value = cc1_target
                     
@@ -545,14 +621,41 @@ class MusicXMLToSWAM:
                     time=delta_time if not messages else time_offset
                 ))
             
-            # Add brightness for more attack
+            # Add harmonics for more attack
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
-                control=SWAMCCMapper.CC_BRIGHTNESS,
+                control=SWAMCCMapper.CC_HARMONICS,
                 value=min(127, 64 + 15),
                 time=0
             ))
+            
+            # Add bow controls for staccato (violin only)
+            if self.instrument == SWAMInstrument.VIOLIN:
+                # Dynamic bow force based on expression + staccato character
+                import random
+                staccato_force = int(60 + (base_expression - 20) * 0.25) + random.randint(-3, 3)
+                staccato_force = max(55, min(85, staccato_force))
+                
+                # Bow position: toward bridge for brightness + slight variation
+                staccato_position = 70 + random.randint(-2, 2)
+                
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=staccato_force,
+                    time=0
+                ))
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_POSITION,
+                    value=staccato_position,
+                    time=0
+                ))
+                self.last_cc20_value = staccato_force
+                self.last_cc21_value = staccato_position
             
             # Update last CC11 value (staccato returns to base)
             self.last_cc11_value = base_expression
@@ -576,14 +679,41 @@ class MusicXMLToSWAM:
                     time=delta_time if not messages else time_offset
                 ))
             
-            # Add brightness
+            # Add harmonics
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
-                control=SWAMCCMapper.CC_BRIGHTNESS,
+                control=SWAMCCMapper.CC_HARMONICS,
                 value=min(127, 64 + 25),
                 time=0
             ))
+            
+            # Add bow controls for marcato (violin only)
+            if self.instrument == SWAMInstrument.VIOLIN:
+                # Heavy bow force for marcato + variation
+                import random
+                marcato_force = int(85 + (base_expression - 20) * 0.15) + random.randint(-4, 4)
+                marcato_force = max(80, min(105, marcato_force))
+                
+                # Toward bridge for power + variation
+                marcato_position = 68 + random.randint(-3, 3)
+                
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=marcato_force,
+                    time=0
+                ))
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_POSITION,
+                    value=marcato_position,
+                    time=0
+                ))
+                self.last_cc20_value = marcato_force
+                self.last_cc21_value = marcato_position
             
             # Update last CC11 value (marcato sustains at base)
             self.last_cc11_value = base_expression
@@ -607,14 +737,43 @@ class MusicXMLToSWAM:
                     time=delta_time if not messages else time_offset
                 ))
             
-            # Add brightness
+            # Add harmonics
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
-                control=SWAMCCMapper.CC_BRIGHTNESS,
+                control=SWAMCCMapper.CC_HARMONICS,
                 value=min(127, 64 + 20),
                 time=0
             ))
+            
+            # Add bow controls for accent (violin only)
+            if self.instrument == SWAMInstrument.VIOLIN:
+                # Accent bow force depends on accent strength + variation
+                import random
+                is_strong = ArticulationType.STRONG_ACCENT in note_art.articulations
+                accent_base = 78 if is_strong else 72
+                accent_force = int(accent_base + (base_expression - 20) * 0.2) + random.randint(-4, 4)
+                accent_force = max(65, min(95, accent_force))
+                
+                # Slightly toward bridge + variation
+                accent_position = 66 + random.randint(-3, 3)
+                
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=accent_force,
+                    time=0
+                ))
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_POSITION,
+                    value=accent_position,
+                    time=0
+                ))
+                self.last_cc20_value = accent_force
+                self.last_cc21_value = accent_position
             
             # Update last CC11 value (accent sustains at base)
             self.last_cc11_value = base_expression
@@ -623,16 +782,91 @@ class MusicXMLToSWAM:
         
         # For other articulations, modify based on type
         expression_value = base_expression
-        brightness_value = 64
+        harmonics_value = 64
         modulation_value = 0
+        bow_force = None  # Will be calculated if needed (don't reset to 64)
+        bow_position = None  # Will be calculated if needed (don't reset to 64)
         
+        # Check if this is a "plain" note without special articulation handling
+        has_special_articulation = (
+            ArticulationType.STACCATISSIMO in note_art.articulations or
+            ArticulationType.TENUTO in note_art.articulations
+        )
+        
+        # Apply Phase 1 CC11 envelope for plain notes (no special articulation)
+        # This gives natural bow dynamics instead of flat CC11
+        # Note: For MusicXML workflow, we use a simplified envelope approach
+        # that sets initial CC values before note-on, rather than scheduling
+        # messages throughout the note duration.
+        if not has_special_articulation and len(note_art.articulations) == 0:
+            # Add Phase 1 interval-aware portamento before the note
+            portamento_config = self.instrument_config.get('portamento', {})
+            if portamento_config.get('enabled', True) and self.prev_pitch is not None:
+                portamento_amount = self.cc_mapper.calculate_portamento_amount(
+                    self.prev_pitch,
+                    note_art.pitch,
+                    base_amount=portamento_config.get('base_amount', 60)
+                )
+                
+                if portamento_amount > 0:
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_PORTAMENTO,
+                        value=portamento_amount,
+                        time=delta_time
+                    ))
+                    delta_time = 0  # Portamento consumed the delta_time
+                    
+                    # Reset portamento immediately (tighter timing)
+                    messages.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_PORTAMENTO,
+                        value=0,
+                        time=0  # Reset immediately with note-on
+                    ))
+            
+            # Phase 1 simplified envelope: Use smooth ramp approach
+            # Set expression slightly below target, let SWAM's envelope do the rest
+            # This preserves attack timing while avoiding flat CC11
+            attack_value = int(base_expression * 0.9)  # Start at 90% (more subtle)
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=attack_value,
+                time=delta_time if not messages else 0
+            ))
+            
+            # Add coupled CC2 (bow pressure) with CC11
+            cc2_value = self.cc_mapper._cc11_to_cc2(attack_value)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
+            # Track last CC11 value
+            self.last_cc11_value = attack_value
+            
+            return messages
+        
+        # For articulated notes (staccatissimo, tenuto), apply articulation modifiers
         for art in note_art.articulations:
             if art == ArticulationType.STACCATISSIMO:
                 expression_value = max(20, expression_value - 30)
-                brightness_value = min(127, brightness_value + 25)
+                harmonics_value = min(127, harmonics_value + 25)
+                bow_force = 75  # Light, quick bow for staccatissimo
+                bow_position = 75  # Closer to bridge for brightness
             
             elif art == ArticulationType.TENUTO:
                 expression_value = min(127, expression_value + 5)
+                bow_force = min(100, int(expression_value * 0.9))  # Sustained pressure
+                bow_position = 60  # Slightly toward fingerboard for warmth
         
         # Automatic vibrato disabled - use explicit vibrato articulation marks instead
         # If you want automatic vibrato, add it in MuseScore using vibrato marks
@@ -676,6 +910,16 @@ class MusicXMLToSWAM:
                         value=msg.value,
                         time=time_offset
                     ))
+                
+                # Add coupled CC2 (bow pressure) for each CC11 value
+                cc2_value = self.cc_mapper._cc11_to_cc2(msg.value)
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BREATH,
+                    value=cc2_value,
+                    time=0
+                ))
         else:
             # Small or no change - direct transition
             messages.append(mido.Message(
@@ -685,18 +929,28 @@ class MusicXMLToSWAM:
                 value=expression_value,
                 time=delta_time
             ))
+            
+            # Add coupled CC2 (bow pressure)
+            cc2_value = self.cc_mapper._cc11_to_cc2(expression_value)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
         
         # Update tracked value
         self.last_cc11_value = expression_value
         
-        # Add brightness CC with smooth transition
-        if brightness_value != 64:
-            if abs(brightness_value - self.last_cc74_value) > 10:
-                # Significant brightness change - smooth it
+        # Add harmonics CC with smooth transition
+        if harmonics_value != 64:
+            if abs(harmonics_value - self.last_cc74_value) > 10:
+                # Significant harmonics change - smooth it
                 cc74_ramp = self.cc_mapper._create_ramp(
-                    cc_number=SWAMCCMapper.CC_BRIGHTNESS,
+                    cc_number=SWAMCCMapper.CC_HARMONICS,
                     start_value=self.last_cc74_value,
-                    end_value=brightness_value,
+                    end_value=harmonics_value,
                     duration_ticks=10,
                     steps=2
                 )
@@ -712,11 +966,11 @@ class MusicXMLToSWAM:
                 messages.append(mido.Message(
                     'control_change',
                     channel=0,
-                    control=SWAMCCMapper.CC_BRIGHTNESS,
-                    value=brightness_value,
+                    control=SWAMCCMapper.CC_HARMONICS,
+                    value=harmonics_value,
                     time=0
                 ))
-            self.last_cc74_value = brightness_value
+            self.last_cc74_value = harmonics_value
         
         # Add vibrato CC with smooth onset
         if modulation_value > 0:
@@ -756,6 +1010,47 @@ class MusicXMLToSWAM:
                 time=0
             ))
             self.last_cc1_value = 0
+        
+        # Add bow force and position (violin only)
+        if self.instrument == SWAMInstrument.VIOLIN:
+            # Couple bow force to expression for normal notes
+            if bow_force is None:  # Not set by articulation - calculate it
+                # Map expression (20-127) to bow force (35-105)
+                # Soft playing = light bow, loud playing = heavy bow
+                bow_force = int(35 + (expression_value - 20) * 0.65)
+                bow_force = max(35, min(105, bow_force))
+                
+                # Add subtle random variation for human feel (+/- 5)
+                import random
+                variation = random.randint(-5, 5)
+                bow_force = max(35, min(105, bow_force + variation))
+            
+            # Adjust bow position based on phrase position (slight drift for realism)
+            if bow_position is None:  # Not set by articulation - calculate it
+                # Add subtle variation based on velocity for natural movement
+                velocity_factor = (note_art.velocity - 64) / 127.0  # -0.5 to +0.5 range
+                bow_position = int(64 + velocity_factor * 10)  # 59-69 range
+                bow_position = max(55, min(75, bow_position))
+            
+            # Add bow force CC (always send for dynamic expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_FORCE,
+                value=bow_force,
+                time=0
+            ))
+            self.last_cc20_value = bow_force
+            
+            # Add bow position CC (always send for natural bow movement)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_POSITION,
+                value=bow_position,
+                time=0
+            ))
+            self.last_cc21_value = bow_position
         
         # Add legato (sustain) for slurred notes
         if note_art.in_slur:
@@ -882,6 +1177,15 @@ class MusicXMLToSWAM:
             time=0
         ))
         
+        # Bow pressure (coupled to expression)
+        messages.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=SWAMCCMapper.CC_BREATH,
+            value=self.cc_mapper._cc11_to_cc2(80),
+            time=0
+        ))
+        
         # Modulation (vibrato)
         messages.append(mido.Message(
             'control_change',
@@ -891,14 +1195,34 @@ class MusicXMLToSWAM:
             time=0
         ))
         
-        # Brightness
+        # Harmonics
         messages.append(mido.Message(
             'control_change',
             channel=0,
-            control=SWAMCCMapper.CC_BRIGHTNESS,
+            control=SWAMCCMapper.CC_HARMONICS,
             value=64,
             time=0
         ))
+        
+        # Bow Force (strings only)
+        if self.instrument == SWAMInstrument.VIOLIN:
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_FORCE,
+                value=64,  # Neutral bow pressure
+                time=0
+            ))
+        
+        # Bow Position (strings only)
+        if self.instrument == SWAMInstrument.VIOLIN:
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_POSITION,
+                value=64,  # Neutral bow position
+                time=0
+            ))
         
         # Sustain
         messages.append(mido.Message(

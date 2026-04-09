@@ -31,12 +31,14 @@ class SWAMCCMapper:
     CC_MODULATION = 1
     CC_BREATH = 2
     CC_PORTAMENTO = 5
-    CC_BOW_POSITION = 9  # CC9 for strings (sul ponticello, sul tasto)
     CC_EXPRESSION = 11
+    CC_VIBRATO_RATE = 17  # CC17 for vibrato speed
     CC_GROWL = 18  # CC18 for saxophone growl
+    CC_BOW_FORCE = 20  # CC20 for bow pressure on strings
+    CC_BOW_POSITION = 21  # CC21 for bow position (sul tasto to sul ponticello)
     CC_SUSTAIN = 64
     CC_LEGATO = 68  # CC68 for legato switch (some SWAM instruments)
-    CC_BRIGHTNESS = 74
+    CC_HARMONICS = 74  # Custom mapping - adds harmonic content/brilliance
     
     def __init__(self, instrument: SWAMInstrument):
         """
@@ -47,6 +49,25 @@ class SWAMCCMapper:
         """
         self.instrument = instrument
         self.channel = 0  # Default MIDI channel
+    
+    def _cc11_to_cc2(self, cc11_value: int) -> int:
+        """
+        Calculate CC2 (Bow Pressure/Breath) from CC11 (Expression).
+        
+        Couples bow pressure to dynamics for realistic performance:
+        - Soft playing (low CC11) = light bow pressure (lower CC2)
+        - Loud playing (high CC11) = heavy bow pressure (higher CC2)
+        
+        Args:
+            cc11_value: CC11 expression value (0-127)
+            
+        Returns:
+            CC2 bow pressure value (0-127)
+        """
+        # CC2 follows CC11 with slight offset to avoid over-saturation
+        # Formula: CC2 = CC11 * 0.85 + 10 (keeps CC2 in sweet spot)
+        cc2_value = int(cc11_value * 0.85 + 10)
+        return max(20, min(127, cc2_value))  # Clamp to valid range
     
     def _create_ramp(
         self,
@@ -134,12 +155,12 @@ class SWAMCCMapper:
         
         # For loud notes, add brightness
         if velocity > 100:
-            brightness = min(127, int(expression_value * 1.1))
+            harmonics = min(127, int(expression_value * 1.1))
             messages.append(mido.Message(
                 'control_change',
                 channel=self.channel,
-                control=self.CC_BRIGHTNESS,
-                value=brightness,
+                control=self.CC_HARMONICS,
+                value=harmonics,
                 time=0
             ))
         
@@ -286,7 +307,18 @@ class SWAMCCMapper:
             duration_ticks=2,
             steps=2
         )
-        messages.extend(ramp_up)
+        for time_offset, cc11_msg in ramp_up:
+            messages.append((time_offset, cc11_msg))
+            # Add coupled CC2 (bow pressure)
+            cc2_value = self._cc11_to_cc2(cc11_msg.value)
+            cc2_msg = mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=self.CC_BREATH,
+                value=cc2_value,
+                time=0
+            )
+            messages.append((time_offset, cc2_msg))
         
         # Quick decay to sustain level (3 steps over 4 ticks)
         sustain_level = max(20, int(base_cc11 * 0.4))
@@ -298,8 +330,18 @@ class SWAMCCMapper:
             steps=3
         )
         # Offset by the ramp up duration
-        for time_offset, msg in ramp_down:
-            messages.append((time_offset + 2, msg))
+        for time_offset, cc11_msg in ramp_down:
+            messages.append((time_offset + 2, cc11_msg))
+            # Add coupled CC2
+            cc2_value = self._cc11_to_cc2(cc11_msg.value)
+            cc2_msg = mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=self.CC_BREATH,
+                value=cc2_value,
+                time=0
+            )
+            messages.append((time_offset + 2, cc2_msg))
         
         # Restore baseline for next note (gradual)
         restore_time = duration_ticks - 6 if duration_ticks > 10 else 5
@@ -341,7 +383,18 @@ class SWAMCCMapper:
             duration_ticks=6,
             steps=3
         )
-        messages.extend(ramp_up)
+        for time_offset, cc11_msg in ramp_up:
+            messages.append((time_offset, cc11_msg))
+            # Add coupled CC2
+            cc2_value = self._cc11_to_cc2(cc11_msg.value)
+            cc2_msg = mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=self.CC_BREATH,
+                value=cc2_value,
+                time=0
+            )
+            messages.append((time_offset, cc2_msg))
         
         # Quick decay to sustained level (2 steps over 4 ticks)
         ramp_down = self._create_ramp(
@@ -351,8 +404,18 @@ class SWAMCCMapper:
             duration_ticks=4,
             steps=2
         )
-        for time_offset, msg in ramp_down:
-            messages.append((time_offset + 6, msg))
+        for time_offset, cc11_msg in ramp_down:
+            messages.append((time_offset + 6, cc11_msg))
+            # Add coupled CC2
+            cc2_value = self._cc11_to_cc2(cc11_msg.value)
+            cc2_msg = mido.Message(
+                'control_change',
+                channel=self.channel,
+                control=self.CC_BREATH,
+                value=cc2_value,
+                time=0
+            )
+            messages.append((time_offset + 6, cc2_msg))
         
         return messages
     
@@ -384,7 +447,13 @@ class SWAMCCMapper:
             duration_ticks=8,
             steps=4
         )
-        messages.extend(ramp_up)
+        # Add CC11 messages with coupled CC2 (bow pressure)
+        for time_offset, cc11_msg in ramp_up:
+            messages.append((time_offset, cc11_msg))
+            cc2_value = self._cc11_to_cc2(cc11_msg.value)
+            cc2_msg = mido.Message('control_change', channel=self.channel,
+                                   control=self.CC_BREATH, value=cc2_value, time=0)
+            messages.append((time_offset, cc2_msg))
         
         # Slightly longer decay (3 steps over 7 ticks)
         ramp_down = self._create_ramp(
@@ -394,8 +463,13 @@ class SWAMCCMapper:
             duration_ticks=7,
             steps=3
         )
-        for time_offset, msg in ramp_down:
-            messages.append((time_offset + 8, msg))
+        # Add CC11 messages with coupled CC2 (bow pressure)
+        for time_offset, cc11_msg in ramp_down:
+            messages.append((time_offset + 8, cc11_msg))
+            cc2_value = self._cc11_to_cc2(cc11_msg.value)
+            cc2_msg = mido.Message('control_change', channel=self.channel,
+                                   control=self.CC_BREATH, value=cc2_value, time=0)
+            messages.append((time_offset + 8, cc2_msg))
         
         return messages
     
@@ -413,7 +487,7 @@ class SWAMCCMapper:
             target_depth: Target CC1 vibrato depth (0-127)
             delay_ticks: Wait this many ticks before starting vibrato
             ramp_duration_ticks: Duration of ramp from 0 to target
-            steps: Number of interpolation steps
+            steps: Number of interpolation steps (recommend 8-12 for smoothness)
             
         Returns:
             List of (time, message) tuples for delayed vibrato
@@ -429,25 +503,205 @@ class SWAMCCMapper:
             time=0
         )))
         
-        # Wait before starting vibrato
-        time_offset = delay_ticks
+        # Use the ramp generator for smooth vibrato onset
+        ramp = self._create_ramp(
+            cc_number=self.CC_MODULATION,
+            start_value=0,
+            end_value=target_depth,
+            duration_ticks=ramp_duration_ticks,
+            steps=max(8, steps)  # Ensure at least 8 steps for smoothness
+        )
         
-        # Gradual ramp up
-        step_size = target_depth / steps
-        time_step = ramp_duration_ticks // steps
-        
-        for i in range(1, steps + 1):
-            value = int(step_size * i)
-            messages.append((time_offset, mido.Message(
-                'control_change',
-                channel=self.channel,
-                control=self.CC_MODULATION,
-                value=value,
-                time=0
-            )))
-            time_offset = time_step
+        # Add delay offset to all ramp messages
+        for ramp_offset, msg in ramp:
+            messages.append((delay_ticks + ramp_offset if ramp_offset == 0 else ramp_offset, msg))
         
         return messages
+    
+    def create_note_envelope(
+        self,
+        envelope_type: str,
+        base_cc11: int,
+        duration_ticks: int,
+        velocity: int = 64
+    ) -> List[Tuple[int, mido.Message]]:
+        """
+        Create a CC11 envelope for a note to add natural bow/breath dynamics.
+        
+        This is THE critical feature for realistic SWAM - every note needs dynamic
+        shaping, not flat CC11. Different envelope types create different articulations.
+        
+        Args:
+            envelope_type: Type of envelope ('default', 'expressive', 'gentle', 'percussive')
+            base_cc11: Baseline expression value (0-127)
+            duration_ticks: Total duration of the note in ticks
+            velocity: Note velocity for dynamic scaling (0-127)
+            
+        Returns:
+            List of (time_offset, message) tuples for the envelope
+        """
+        messages = []
+        
+        # Scale envelope based on velocity
+        velocity_scale = velocity / 127.0
+        
+        # Define envelope shapes as (time_ratio, cc11_ratio) points
+        # time_ratio: position in note (0.0 = start, 1.0 = end)
+        # cc11_ratio: expression relative to base (1.0 = base, 1.2 = 20% above)
+        envelopes = {
+            'default': [
+                (0.0, 0.7),   # Start softer
+                (0.15, 1.0),  # Rise to base
+                (0.7, 1.0),   # Sustain
+                (1.0, 0.85),  # Gentle release
+            ],
+            'expressive': [
+                (0.0, 0.6),   # Soft start
+                (0.2, 1.1),   # Rise above base
+                (0.5, 1.05),  # Slight decay
+                (0.8, 1.0),   # Return to base
+                (1.0, 0.8),   # Clear release
+            ],
+            'gentle': [
+                (0.0, 0.75),  # Gentle attack
+                (0.25, 0.95), # Gradual rise
+                (0.8, 0.9),   # Sustained
+                (1.0, 0.7),   # Soft release
+            ],
+            'percussive': [
+                (0.0, 0.8),   # Quick start
+                (0.08, 1.15), # Sharp peak
+                (0.2, 0.85),  # Fast decay
+                (0.6, 0.75),  # Low sustain
+                (1.0, 0.6),   # Release
+            ]
+        }
+        
+        envelope_points = envelopes.get(envelope_type, envelopes['default'])
+        
+        # Generate CC messages from envelope points
+        for i in range(len(envelope_points)):
+            time_ratio, cc11_ratio = envelope_points[i]
+            
+            # Calculate absolute values
+            time_offset = int(duration_ticks * time_ratio)
+            cc11_value = int(base_cc11 * cc11_ratio * (0.7 + 0.3 * velocity_scale))
+            cc11_value = max(20, min(127, cc11_value))  # Clamp to valid range
+            
+            # Create smooth interpolation to next point if not the last
+            if i < len(envelope_points) - 1:
+                next_time_ratio, next_cc11_ratio = envelope_points[i + 1]
+                next_time_offset = int(duration_ticks * next_time_ratio)
+                next_cc11_value = int(base_cc11 * next_cc11_ratio * (0.7 + 0.3 * velocity_scale))
+                next_cc11_value = max(20, min(127, next_cc11_value))
+                
+                # Create smooth ramp between points
+                segment_duration = next_time_offset - time_offset
+                steps = max(2, segment_duration // 40)  # One step per ~40 ticks
+                
+                ramp = self._create_ramp(
+                    cc_number=self.CC_EXPRESSION,
+                    start_value=cc11_value,
+                    end_value=next_cc11_value,
+                    duration_ticks=segment_duration,
+                    steps=steps
+                )
+                
+                # Add CC11 messages with coupled CC2 (bow pressure)
+                for ramp_offset, cc11_msg in ramp:
+                    # Add CC11 message
+                    messages.append((time_offset + ramp_offset, cc11_msg))
+                    
+                    # Add CC2 (bow pressure) message coupled to CC11
+                    cc2_value = self._cc11_to_cc2(cc11_msg.value)
+                    cc2_msg = mido.Message(
+                        'control_change',
+                        channel=self.channel,
+                        control=self.CC_BREATH,
+                        value=cc2_value,
+                        time=0
+                    )
+                    messages.append((time_offset + ramp_offset, cc2_msg))
+        
+        return messages
+    
+    def calculate_portamento_amount(
+        self,
+        prev_pitch: int,
+        current_pitch: int,
+        base_amount: int = 50
+    ) -> int:
+        """
+        Calculate interval-aware portamento amount (CC70 or CC5).
+        
+        This adds musical intelligence - small intervals get subtle slides,
+        large leaps get more pronounced portamento based on musical context.
+        
+        Args:
+            prev_pitch: Previous MIDI note number (0-127)
+            current_pitch: Current MIDI note number (0-127)
+            base_amount: Base portamento intensity (0-127)
+            
+        Returns:
+            CC value for portamento (0-127)
+        """
+        if prev_pitch is None:
+            return 0  # No portamento for first note
+        
+        # Calculate interval in semitones
+        interval = abs(current_pitch - prev_pitch)
+        
+        # Musical interval-based portamento mapping
+        if interval == 0:
+            # Same note (repeated) - no slide
+            return 0
+        elif interval == 1:
+            # Half-step - very subtle slide
+            return int(base_amount * 0.1)
+        elif interval == 2:
+            # Whole-step - subtle slide
+            return int(base_amount * 0.2)
+        elif interval <= 4:
+            # Minor/major third - moderate slide
+            return int(base_amount * 0.35)
+        elif interval <= 7:
+            # Fourth/fifth - noticeable slide
+            return int(base_amount * 0.5)
+        elif interval <= 12:
+            # Octave or less - expressive slide
+            return int(base_amount * 0.7)
+        else:
+            # Large leap - maximum expressiveness
+            return int(base_amount * 0.9)
+    
+    def apply_portamento_smart(
+        self,
+        prev_pitch: int,
+        current_pitch: int,
+        base_amount: int = 60,
+        time: int = 0
+    ) -> mido.Message:
+        """
+        Apply interval-aware portamento using CC5.
+        
+        Args:
+            prev_pitch: Previous MIDI note number
+            current_pitch: Current MIDI note number
+            base_amount: Base portamento intensity (0-127)
+            time: Delta time for the message
+            
+        Returns:
+            MIDI control change message for portamento
+        """
+        amount = self.calculate_portamento_amount(prev_pitch, current_pitch, base_amount)
+        
+        return mido.Message(
+            'control_change',
+            channel=self.channel,
+            control=self.CC_PORTAMENTO,
+            value=amount,
+            time=time
+        )
     
     def apply_sul_ponticello(
         self,
@@ -656,7 +910,7 @@ def get_default_cc_values(instrument: SWAMInstrument) -> dict:
     defaults = {
         SWAMCCMapper.CC_EXPRESSION: 80,
         SWAMCCMapper.CC_MODULATION: 0,  # No vibrato by default
-        SWAMCCMapper.CC_BRIGHTNESS: 64,
+        SWAMCCMapper.CC_HARMONICS: 64,
     }
     
     if instrument == SWAMInstrument.SAXOPHONE:
