@@ -174,9 +174,11 @@ For detailed workflow information, see [Workflow Guide](docs/workflow_guide.md).
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Interested in contributing? Please contact the project owner for collaboration opportunities.
 
-Areas for improvement:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for technical details.
+
+Areas for development:
 - Additional SWAM instrument support (cello, trumpet, etc.)
 - More sophisticated articulation detection
 - Real-time MIDI processing
@@ -184,7 +186,11 @@ Areas for improvement:
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details.
+Copyright (c) 2026 averkoc. All Rights Reserved.
+
+This is proprietary software. See [LICENSE](LICENSE) file for details.
+
+For licensing inquiries, please contact the copyright holder.
 
 ## Resources
 

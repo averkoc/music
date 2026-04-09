@@ -2,6 +2,18 @@
 
 Thank you for your interest in contributing! This project aims to make expressive virtual instrument performance accessible to music composers.
 
+## Important: Proprietary Software Notice
+
+This software is proprietary and all rights are reserved by the copyright holder (averkoc). 
+
+**By contributing to this project, you agree that:**
+- All contributions become the property of the copyright holder
+- The copyright holder may use contributions in commercial offerings
+- The copyright holder may relicense the code under different terms
+- You waive any claims to contributed code
+
+Please contact the project owner before making substantial contributions to discuss collaboration terms.
+
 ## How to Contribute
 
 ### Reporting Bugs
