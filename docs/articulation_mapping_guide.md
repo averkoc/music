@@ -8,12 +8,16 @@ SWAM instruments are **physically modeled** virtual instruments that respond to 
 
 ## Key MIDI CC Numbers for SWAM
 
+**Note**: These CC mappings are verified against SWAM's official MIDI mapping export from Audio Modeling (see [EXPORTED_MIDIMAPPING.swam](EXPORTED_MIDIMAPPING.swam) for the actual SWAM preset file).
+
 | CC# | Name | Purpose | Typical Range |
 |-----|------|---------|---------------|
 | **CC1** | Modulation | Vibrato depth/speed | 0 (none) to 127 (intense) |
 | **CC2** | Breath | Air pressure (winds) | 40-100 (normal playing) |
-| **CC5** | Portamento | Pitch slide time | 0 (none) to 60 (slow glide) |
-| **CC9** | Bow Position | Sul pont ↔ Sul tasto | 0 (tasto) to 127 (ponte) |
+| **CC5** | Portamento | Pitch slide time | 1 (min) to 127 (slow glide) |
+| **CC17** | Vibrato Rate | Vibrato speed | 0 to 127 |
+| **CC20** | Bow Force | Bow pressure | 0 to 127 |
+| **CC21** | Bow Position | Sul pont ↔ Sul tasto | 0 (tasto) to 127 (ponte) |
 | **CC11** | Expression | Dynamic level | 20 (ppp) to 127 (fff) |
 | **CC18** | Growl | Harmonic distortion (sax) | 0 (clean) to 100 (growling) |
 | **CC64** | Sustain | Legato mode | 0 (off) or 127 (on) |
@@ -181,13 +185,13 @@ t=240 (50%): Note OFF (if original was 480 ticks)
 **MIDI Implementation**:
 ```json
 {
-  "cc9_value": 115,
-  "cc9_range": [110, 127]
+  "cc21_value": 115,
+  "cc21_range": [110, 127]
 }
 ```
 
 **Reasoning**:
-- **CC9**: Controls bow position on string instruments
+- **CC21**: Controls bow position on string instruments
 - **High values (110-127)**: Near bridge = bright, thin tone
 - **Configurable range**: Subtle sul pont (110) to extreme (127)
 - **Only for strings**: Not applicable to saxophone
@@ -365,7 +369,7 @@ delay_ticks = (500 / ms_per_beat) × ticks_per_beat
 | `cc1_target` | 40-80 | 64 | Below 40 = subtle, above 80 = exaggerated |
 | `delay_ms` | 200-800 | 500 | Below 200 = too fast, above 800 = obvious |
 | `overlap_percent` | 5-20 | 10 | Below 5 = gaps, above 20 = muddy |
-| `cc9_value` (sul pont) | 105-127 | 115 | Below 105 = less effect |
+| `cc21_value` (sul pont) | 105-127 | 115 | Below 105 = less effect |
 | `portamento` (CC5) | 20-60 | 40 | Above 60 = exaggerated slide |
 
 ---
@@ -410,7 +414,7 @@ Violin and saxophone have different physical constraints. Don't copy settings bl
 **Solution**: Increase `overlap_percent` to 12-15%
 
 ### Problem: Sul ponticello not bright enough
-**Solution**: Increase `cc9_value` to 120-125 and adjust `cc74` (brightness)
+**Solution**: Increase `cc21_value` to 120-125 and adjust `cc74` (brightness)
 
 ### Problem: SWAM not responding to articulations
 **Solution**: Check that initialization messages are sent (CC11 movement at track start)
@@ -420,7 +424,7 @@ Violin and saxophone have different physical constraints. Don't copy settings bl
 ## References
 
 - [SWAM Documentation](https://www.audiomodeling.com)
-- [Camelot Integration Guide](../config/camelot/README.md)
+- [SWAM MIDI Mapping Preset](EXPORTED_MIDIMAPPING.swam) - Official CC mappings from SWAM
 - [MuseScore Articulation Reference](https://musescore.org/en/handbook)
 - [MIDI CC Reference](https://www.midi.org/specifications)
 

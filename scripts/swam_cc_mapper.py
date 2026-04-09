@@ -175,17 +175,19 @@ class SWAMCCMapper:
         Add vibrato using modulation (CC1).
         
         Args:
-            depth: Vibrato depth (0-127)
+            depth: Vibrato depth (0-110, SWAM maximum is 110)
             time: Delta time for the message
             
         Returns:
             MIDI control change message
         """
+        # Clamp to SWAM's maximum vibrato depth of 110
+        clamped_depth = max(0, min(110, depth))
         return mido.Message(
             'control_change',
             channel=self.channel,
             control=self.CC_MODULATION,
-            value=depth,
+            value=clamped_depth,
             time=time
         )
     
@@ -484,7 +486,7 @@ class SWAMCCMapper:
         Apply vibrato gradually after note onset (vibrato mark).
         
         Args:
-            target_depth: Target CC1 vibrato depth (0-127)
+            target_depth: Target CC1 vibrato depth (0-110, SWAM maximum is 110)
             delay_ticks: Wait this many ticks before starting vibrato
             ramp_duration_ticks: Duration of ramp from 0 to target
             steps: Number of interpolation steps (recommend 8-12 for smoothness)
@@ -493,8 +495,9 @@ class SWAMCCMapper:
             List of (time, message) tuples for delayed vibrato
         """
         messages = []
-        
-        # Start with no vibrato
+                # Clamp target_depth to SWAM's maximum of 110
+        target_depth = min(110, target_depth)
+                # Start with no vibrato
         messages.append((0, mido.Message(
             'control_change',
             channel=self.channel,
@@ -709,10 +712,10 @@ class SWAMCCMapper:
         time: int = 0
     ) -> mido.Message:
         """
-        Apply sul ponticello (bow near bridge) using CC9.
+        Apply sul ponticello (bow near bridge) using CC21.
         
         Args:
-            position_value: CC9 value for bow position (110-127 = near bridge)
+            position_value: CC21 value for bow position (110-127 = near bridge)
             time: Delta time for the message
             
         Returns:
@@ -732,10 +735,10 @@ class SWAMCCMapper:
         time: int = 0
     ) -> mido.Message:
         """
-        Apply sul tasto (bow over fingerboard) using CC9.
+        Apply sul tasto (bow over fingerboard) using CC21.
         
         Args:
-            position_value: CC9 value for bow position (0-20 = over fingerboard)
+            position_value: CC21 value for bow position (0-20 = over fingerboard)
             time: Delta time for the message
             
         Returns:
@@ -758,7 +761,7 @@ class SWAMCCMapper:
         Apply portamento (pitch slide) using CC5.
         
         Args:
-            amount: CC5 portamento time (0-127)
+            amount: CC5 portamento time (0=off, 1-127 active; SWAM minimum when active is 1)
             time: Delta time for the message
             
         Returns:

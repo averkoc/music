@@ -1,5 +1,7 @@
 ﻿# Camelot MIDI Mapping Integration
 
+> **⚠️ DEPRECATED**: This workflow is no longer recommended. The Python scripts in this project generate processed MIDI files that work directly in any DAW with VST3 support, without requiring Camelot as an intermediary. This documentation is kept for reference only.
+
 **Camelot** is made by **Audio Modeling** - the same company that creates SWAM instruments! This means Camelot has native, optimized MIDI mappings for SWAM instruments built right in.
 
 ## What is Camelot?

@@ -67,7 +67,7 @@ def example_apply_articulations():
     
     # ===== SUL PONTICELLO =====
     print("\n3. SUL PONTICELLO Articulation:")
-    print("   - Set CC9 (bow position) near bridge")
+    print("   - Set CC21 (bow position) near bridge")
     
     sul_pont_msgs = mapper.apply_articulation(
         ArticulationType.SUL_PONTICELLO,
@@ -145,8 +145,8 @@ To customize articulation behavior, edit config/swam_config.json:
 
 3. SUL PONTICELLO:
    {
-     "cc9_value": 115,                // Default bow position
-     "cc9_range": [110, 127]          // Valid range for effect
+     "cc21_value": 115,                // Default bow position
+     "cc21_range": [110, 127]          // Valid range for effect
    }
 
 4. CRESCENDO/DIMINUENDO:

@@ -29,7 +29,7 @@ Complete guide for converting MuseScore compositions into expressive SWAM instru
          ▼
 ┌─────────────────┐
 │  Python Script  │  Add SWAM-specific CC messages
-│  or Camelot     │  (expression, breath, vibrato)
+│                 │  (expression, breath, vibrato)
 └────────┬────────┘
          │
          ▼
@@ -126,7 +126,7 @@ Save with descriptive names:
 
 ## Processing MIDI Files
 
-### Method 1: Python Script
+### Using the Python Script
 
 ```bash
 # Basic usage
@@ -138,10 +138,6 @@ python scripts/process_midi.py midi_input/melody.mid --instrument saxophone --ou
 # Verbose mode (see processing details)
 python scripts/process_midi.py midi_input/melody.mid --instrument violin -v
 ```
-
-### Method 2: Camelot (Native SWAM Integration)
-
-See `config/camelot/README.md` for real-time routing setup. Camelot is made by Audio Modeling (same company as SWAM) and includes native presets.
 
 ### What the Processing Does
 
@@ -328,9 +324,9 @@ Use MIDI keyboard with:
 ## Next Steps
 
 - Explore additional SWAM instruments (cello, trumpet, flute)
-- Create custom CameloPro presets for your style
 - Develop processing templates for common genres
 - Build a library of reusable MIDI patterns
+- Share your configurations with the community
 
 ---
 

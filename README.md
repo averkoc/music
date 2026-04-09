@@ -1,6 +1,6 @@
 ﻿# MuseScore to SWAM Workflow
 
-Convert MuseScore Studio melodies into expressive performances using SWAM VST3 instruments (violin and saxophone) with proper articulations, dynamics, and continuous controllers.
+Convert MuseScore Studio melodies (single-staff sheet music in MusicXML format) into expressive performances using SWAM VST3 instruments (violin and saxophone) with proper articulations, dynamics, and continuous controllers.
 
 ## Overview
 
@@ -24,7 +24,7 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 - 🎵 **Alternative**: Process basic MIDI exports (limited articulation detection)
 - 🎻 Optimized presets for SWAM Violin and Saxophone
 - 🎚️ Intelligent conversion of articulations to SWAM CC messages
-- 🔄 Integration with Camelot (by Audio Modeling) with native SWAM presets
+- 🎹 Direct DAW integration - processed MIDI works with any DAW supporting VST3
 - 📝 Preserve musical expression (vibrato, crescendo, dynamics, articulations)
 
 ## Project Structure
@@ -34,7 +34,7 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 ├── midi_input/           # MIDI files exported from MuseScore
 ├── midi_output/          # Processed MIDI files for SWAM
 ├── scripts/              # Python MIDI processing tools
-├── config/               # SWAM CC mappings and CameloPro configs
+├── config/               # SWAM CC mappings and configurations
 ├── presets/              # SWAM instrument presets
 └── docs/                 # Documentation and guides
 ```
@@ -46,8 +46,7 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 - Python 3.8 or higher
 - MuseScore Studio (for composition)
 - SWAM Violin and/or Saxophone VST3 plugins
-- Camelot (optional, for real-time MIDI processing with native SWAM integration)
-- A DAW that supports VST3 (Reaper, Cubase, etc.)
+- A DAW that supports VST3 (Reaper, Cubase, Ableton Live, etc.)
 
 ### Installation
 
@@ -97,33 +96,75 @@ python scripts/process_midi.py midi_input/your_file.mid --instrument violin
 
 **Note**: MIDI processing has limited articulation detection. MusicXML is strongly recommended for best results.
 
-### Advanced: Using Camelot (Native SWAM Integration)
-
-Camelot is made by Audio Modeling (same company as SWAM) and provides native presets optimized for SWAM instruments:
-
-1. See setup instructions in `config/camelot/README.md`
-2. Route MuseScore MIDI through Camelot
-3. Select the matching SWAM preset (Violin, Saxophone, etc.)
-4. Camelot will add appropriate CC messages automatically using Audio Modeling's optimized curves
-
 ## SWAM MIDI CC Mappings
 
 ### Essential Controllers
 
+**Note**: These CC mappings are verified against SWAM's official MIDI mapping export (see [docs/EXPORTED_MIDIMAPPING.swam](docs/EXPORTED_MIDIMAPPING.swam)).
+
 | CC# | Parameter | Description |
 |-----|-----------|-------------|
-| CC1 | Modulation | Vibrato depth and speed |
+| CC1 | Modulation | Vibrato depth (0-110 max) |
 | CC2 | Breath | Breath pressure (wind instruments) |
+| CC5 | Portamento | Pitch slide time (1-127, min=1) |
+| CC17 | Vibrato Rate | Vibrato speed/rate |
+| CC20 | Bow Force | Bow pressure on strings |
+| CC21 | Bow Position | Sul ponticello ↔ Sul tasto (strings) |
 | CC11 | Expression | Overall expression/volume |
-| CC74 | Brightness | Tone brightness/timbre |
+| CC18 | Growl | Harmonic distortion (saxophone) |
 | CC64 | Sustain | Sustain pedal (legato) |
+| CC68 | Legato Switch | Legato articulation mode |
+| CC74 | Brightness | Tone brightness/timbre |
 
-### Articulation Mappings
+### Supported Dynamics
 
-- **Staccato**: Short notes, reduced CC11
-- **Legato**: CC64 on, smooth CC1 transitions
-- **Accent**: Peak CC11 at note start
-- **Crescendo/Diminuendo**: Gradual CC11 changes
+All standard dynamics are recognized from MusicXML and mapped to CC11 (Expression):
+
+| Dynamic | Marking | CC11 Value | Description |
+|---------|---------|-----------|-------------|
+| **pppp** | 𝆏𝆏𝆏𝆏 | 10 | Pianississississimo (extremely soft) |
+| **ppp** | 𝆏𝆏𝆏 | 20 | Pianississimo (very very soft) |
+| **pp** | 𝆏𝆏 | 35 | Pianissimo (very soft) |
+| **p** | 𝆏 | 50 | Piano (soft) |
+| **mp** | 𝆐𝆏 | 65 | Mezzo-piano (moderately soft) |
+| **mf** | 𝆐𝆑 | 80 | Mezzo-forte (moderately loud) |
+| **f** | 𝆑 | 95 | Forte (loud) |
+| **ff** | 𝆑𝆑 | 110 | Fortissimo (very loud) |
+| **fff** | 𝆑𝆑𝆑 | 120 | Fortississimo (very very loud) |
+| **ffff** | 𝆑𝆑𝆑𝆑 | 127 | Fortissississimo (extremely loud) |
+
+### Supported Articulations
+
+All standard articulations are recognized from MusicXML and converted to appropriate SWAM CC messages:
+
+| Articulation | Symbol | SWAM Implementation | Description |
+|--------------|--------|---------------------|-------------|
+| **Staccato** | • | CC11 spike + 50% duration | Short, detached notes |
+| **Staccatissimo** | ▼ | CC11 spike + 25% duration | Very short, detached notes |
+| **Accent** | > | CC11 peak at onset | Emphasized attack |
+| **Strong Accent** | ^ | Higher CC11 peak | Very strong emphasis |
+| **Marcato** | ^ | CC11 peak + firm attack | Strongly accented and separated |
+| **Tenuto** | − | Full duration, sustained CC11 | Hold full value |
+| **Legato** | (text) | CC64 on, slight CC5 | Smooth connection |
+| **Slur** | ⌢ | CC64 on, CC5=40, note overlap | Connected with pitch slide |
+| **Spiccato** | (text) | CC11 spike + 40% duration | Bouncing bow (strings) |
+| **Detaché** | (text) | Separate bow, normal CC11 | Detached bow strokes (strings) |
+| **Sul Ponticello** | (text) | CC21=115 | Near bridge, bright tone (strings) |
+| **Sul Tasto** | (text) | CC21=15 | Over fingerboard, dark tone (strings) |
+
+### Supported Expression Elements
+
+Dynamic and expressive markings that span multiple notes:
+
+| Element | Symbol | SWAM Implementation | Description |
+|---------|--------|---------------------|-------------|
+| **Crescendo** | < | Exponential CC11 ramp up | Gradual increase in volume |
+| **Diminuendo** | > | Exponential CC11 ramp down | Gradual decrease in volume |
+| **Vibrato** | ~~~~ | Delayed CC1 ramp (500ms) | Pitch oscillation after onset |
+| **Portamento** | (line) | CC5 moderate + overlap | Sliding pitch between notes |
+| **Glissando** | (line) | CC5=110 + 50% overlap | Dramatic pitch slide |
+
+**Note**: For detailed technical implementation of each articulation (CC values, timing, curves), see [Articulation Mapping Guide](docs/articulation_mapping_guide.md).
 
 ## Quick Start
 
@@ -149,11 +190,9 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 - [MuseScore Studio](https://musescore.org/)
 - [SWAM Instruments](https://audiomodeling.com/)
-- [CameloPro Documentation](https://www.camelaudio.com/)
 - [MIDI CC Reference](https://www.midi.org/specifications)
 
 ## Acknowledgments
 
 - Audio Modeling for SWAM instruments
-- Camel Audio for CameloPro
 - MuseScore community

@@ -466,7 +466,7 @@ This implementation is based on:
 - **Neuroscience of pattern recognition** (why jitter matters)
 - **Music21 library** for MusicXML parsing (with workarounds for SMuFL limitations)
 
-For more details on SWAM CC mappings, see the official Audio Modeling Camelot preset reference.
+For more details on SWAM CC mappings, see the official Audio Modeling documentation.
 
 You should see in the output:
 ```

@@ -132,7 +132,7 @@ class ArticulationMapper:
     def _apply_sul_ponticello(self) -> List[Tuple[int, mido.Message]]:
         """Apply sul ponticello articulation from config."""
         config = self.articulation_config.get('sul_ponticello', {})
-        position = config.get('cc9_value', 115)
+        position = config.get('cc21_value', 115)
         
         msg = self.mapper.apply_sul_ponticello(position_value=position, time=0)
         return [(0, msg)]
@@ -140,7 +140,7 @@ class ArticulationMapper:
     def _apply_sul_tasto(self) -> List[Tuple[int, mido.Message]]:
         """Apply sul tasto articulation from config."""
         config = self.articulation_config.get('sul_tasto', {})
-        position = config.get('cc9_value', 15)
+        position = config.get('cc21_value', 15)
         
         msg = self.mapper.apply_sul_tasto(position_value=position, time=0)
         return [(0, msg)]

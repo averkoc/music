@@ -472,11 +472,13 @@ class MusicXMLToSWAM:
             ))
             
             # Simple immediate vibrato (no delay/ramp for timing reasons)
+            # Ensure cc1_target does not exceed SWAM maximum of 110
+            cc1_clamped = min(110, cc1_target)
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
                 control=SWAMCCMapper.CC_MODULATION,
-                value=cc1_target,
+                value=cc1_clamped,
                 time=0
             ))
             
@@ -500,10 +502,10 @@ class MusicXMLToSWAM:
             ))
             
             self.last_cc11_value = base_expression
-            self.last_cc1_value = cc1_target  # Track vibrato depth
+            self.last_cc1_value = cc1_clamped  # Track vibrato depth (clamped to 110)
             
-            # Store vibrato info for jitter generation (will be added after note-on)
-            note_art._vibrato_targets = (cc1_target, cc17_target, vibrato_config)
+            # Store vibrato info for jitter generation (store clamped value)
+            note_art._vibrato_targets = (cc1_clamped, cc17_target, vibrato_config)
             
             return messages
         
@@ -558,11 +560,13 @@ class MusicXMLToSWAM:
                     ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
                     
                     # Set baseline vibrato state (immediate, no delay/ramp for timing)
+                    # Ensure cc1_target does not exceed SWAM maximum of 110
+                    cc1_clamped = min(110, cc1_target)
                     messages.append(mido.Message(
                         'control_change',
                         channel=0,
                         control=SWAMCCMapper.CC_MODULATION,  # CC1
-                        value=cc1_target,  # Set immediately to baseline level
+                        value=cc1_clamped,  # Set immediately to baseline level (clamped)
                         time=delta_time
                     ))
                     
@@ -594,10 +598,10 @@ class MusicXMLToSWAM:
                     ))
                     
                     self.last_cc11_value = base_expression
-                    self.last_cc1_value = cc1_target
+                    self.last_cc1_value = cc1_clamped  # Track vibrato depth (clamped to 110)
                     
-                    # Store vibrato info for jitter
-                    note_art._vibrato_targets = (cc1_target, cc17_target, default_vibrato_config)
+                    # Store vibrato info for jitter (store clamped value)
+                    note_art._vibrato_targets = (cc1_clamped, cc17_target, default_vibrato_config)
                     
                     return messages
         
@@ -1135,9 +1139,9 @@ class MusicXMLToSWAM:
         current_offset = interval_ticks
         
         while current_offset < remaining_ticks:
-            # Add jitter to CC1 (depth)
+            # Add jitter to CC1 (depth) - clamp to SWAM maximum of 110
             cc1_jitter = random.randint(-cc1_range, cc1_range)
-            cc1_value = max(0, min(127, cc1_target + cc1_jitter))
+            cc1_value = max(0, min(110, cc1_target + cc1_jitter))
             
             messages.append(mido.Message(
                 'control_change',

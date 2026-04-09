@@ -120,7 +120,7 @@ Before submitting a PR:
 ### Medium Priority
 - [ ] Unit tests for CC mapper
 - [ ] More sophisticated crescendo/diminuendo handling
-- [ ] Export CameloPro presets programmatically
+- [ ] Additional SWAM instrument support (cello, trumpet, flute, etc.)
 - [ ] Integration with music21 for analysis
 
 ### Low Priority
