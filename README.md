@@ -190,7 +190,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 - [MuseScore Studio](https://musescore.org/)
 - [SWAM Instruments](https://audiomodeling.com/)
-- [MIDI CC Reference](https://www.midi.org/specifications)
+- [MIDI Control Change Messages](https://midi.org/midi-1-0-control-change-messages)
 
 ## Acknowledgments
 

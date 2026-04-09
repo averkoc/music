@@ -426,7 +426,7 @@ Violin and saxophone have different physical constraints. Don't copy settings bl
 - [SWAM Documentation](https://www.audiomodeling.com)
 - [SWAM MIDI Mapping Preset](EXPORTED_MIDIMAPPING.swam) - Official CC mappings from SWAM
 - [MuseScore Articulation Reference](https://musescore.org/en/handbook)
-- [MIDI CC Reference](https://www.midi.org/specifications)
+- [MIDI Control Change Messages](https://midi.org/midi-1-0-control-change-messages)
 
 ---
 
