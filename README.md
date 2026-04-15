@@ -146,28 +146,6 @@ The architecture and structural context awareness are in place — we're now ite
 └── docs/                 # Documentation and guides
 ```
 
-## Quick Start
-
-### Web Player (Easiest)
-
-**Double-click `start_player.bat`** to launch the web-based MIDI player:
-
-1. Server starts automatically on http://localhost:8000
-2. Browser opens with the player interface
-3. Select a MIDI file from the dropdown
-4. Click Play and adjust tempo slider as needed
-
-**Features:**
-- ✅ 100% CC message preservation
-- ✅ Sub-15ms timing accuracy
-- ✅ Tempo control (25%-200%)
-- ✅ Real-time progress tracking
-- ✅ Works with any SWAM instrument via Web MIDI API
-
-### Traditional DAW Workflow
-
-For composition and editing:
-
 ## Setup
 
 ### Prerequisites
