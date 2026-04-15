@@ -27,6 +27,113 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 - 🎹 Direct DAW integration - processed MIDI works with any DAW supporting VST3
 - 📝 Preserve musical expression (vibrato, crescendo, dynamics, articulations)
 
+## Architecture Overview
+
+### Data Flow & Processing Layers
+
+```
+┌─────────────────┐
+│  MusicXML       │ ← Primary input: MuseScore score with articulations
+│  (Input DSL)    │
+└────────┬────────┘
+         │
+         ├─ Explicit: Notes, articulations, dynamics, slurs, vibrato marks
+         ├─ Structural: Beat strength, measure numbers, time signatures
+         └─ Spanners: Glissando, crescendo/diminuendo wedges
+         
+         ↓
+         
+┌─────────────────────────────────────────────┐
+│  articulation_detector.py                   │
+│  Extracts & enriches score information      │
+└────────┬────────────────────────────────────┘
+         │
+         ├─ Note properties (pitch, duration, velocity)
+         ├─ Articulations (staccato, accent, legato, etc.)
+         ├─ Structural context (in_slur, beat_strength)
+         └─ Sequential context (note_index, previous pitch)
+         
+         ↓
+         
+┌─────────────────────────────────────────────┐
+│  swam_config.json                           │ ← Configuration DSL
+│  Controls interpretation & CC mappings      │
+└────────┬────────────────────────────────────┘
+         │
+         ├─ Feature toggles (metrical_emphasis, portamento, vibrato)
+         ├─ Parameters (emphasis amounts, vibrato depths)
+         └─ CC mappings (articulation → CC patterns)
+         
+         ↓
+         
+┌─────────────────────────────────────────────┐
+│  process_musicxml.py                        │
+│  Decision engine with musical inference     │
+└────────┬────────────────────────────────────┘
+         │
+         ├─ Context-aware mapping (slurs, beat positions, intervals)
+         ├─ Inference layers (metrical emphasis, portamento, vibrato)
+         └─ Physical modeling (bow force/position, breath pressure)
+         
+         ↓
+         
+┌─────────────────┐
+│  MIDI File      │ ← Output: CC messages optimized for SWAM
+│  (SWAM-ready)   │
+└─────────────────┘
+```
+
+### Structural Context & Membership
+
+The processor is **context-aware** — articulations are mapped differently based on structural membership:
+
+**✓ Phrase Context (Currently Implemented):**
+- **Slur membership**: Notes inside slurs get smooth bow connections (note-off velocity 20 vs 64)
+- **Beat position**: Downbeats receive automatic metrical emphasis (+5 CC11)
+- **Pitch register**: Vibrato adapts to string/register (low notes: wider/slower, high notes: narrower/faster)
+- **Interval context**: Portamento amount scales with melodic interval size (half-step vs octave)
+
+**✗ Hierarchical Context (Not Yet Implemented):**
+- Measure boundaries for phrase shaping
+- Position within slur (first/middle/last note)
+- Multi-note coordination (bow direction planning)
+- Dynamic wedge membership (is note inside crescendo?)
+
+### Musical Inference & Automatic Features
+
+Beyond explicit score markings, the processor adds musical intelligence:
+
+**Configurable (swam_config.json):**
+- Metrical emphasis on strong beats (default: enabled)
+- Interval-based portamento (default: enabled)
+- Baseline vibrato on sustained notes (default: enabled)
+- Pitch-dependent vibrato characteristics (default: enabled)
+
+**Always Active:**
+- Natural attack envelopes (soft start → full expression)
+- CC2 breath/bow pressure coupling (follows CC11 dynamics)
+- Note-off velocity from articulation type (physical modeling)
+- Duration adjustments (staccato 35%, glissando extended overlap)
+
+**Estimated (when score incomplete):**
+- Hairpin endpoints (±2 dynamic levels if no marking at end)
+
+See [docs/phase1_musicxml_integration.md](docs/phase1_musicxml_integration.md) for complete feature documentation.
+
+### ⚠️ CC Mapping Status
+
+**Important**: CC value mappings are **work in progress** and not yet fully tuned for optimal SWAM response. Some articulations and dynamic nuances may not be as audible in the output MIDI as intended. We're actively refining:
+
+- Attack envelope shapes and timing
+- Dynamic range compression/expansion curves
+- Vibrato onset delays and depth scaling
+- Bow force/position relationships
+- Articulation CC value peaks and sustain levels
+
+The architecture and structural context awareness are in place — we're now iteratively tuning the numerical parameters through listening tests with actual SWAM instruments.
+
+**Contributions welcome!** If you're a SWAM user with experience in realistic string/wind techniques, your feedback on CC tuning would be valuable.
+
 ## Project Structure
 
 ```
@@ -38,6 +145,28 @@ MIDI export loses most of this information, requiring guesswork to reconstruct a
 ├── presets/              # SWAM instrument presets
 └── docs/                 # Documentation and guides
 ```
+
+## Quick Start
+
+### Web Player (Easiest)
+
+**Double-click `start_player.bat`** to launch the web-based MIDI player:
+
+1. Server starts automatically on http://localhost:8000
+2. Browser opens with the player interface
+3. Select a MIDI file from the dropdown
+4. Click Play and adjust tempo slider as needed
+
+**Features:**
+- ✅ 100% CC message preservation
+- ✅ Sub-15ms timing accuracy
+- ✅ Tempo control (25%-200%)
+- ✅ Real-time progress tracking
+- ✅ Works with any SWAM instrument via Web MIDI API
+
+### Traditional DAW Workflow
+
+For composition and editing:
 
 ## Setup
 

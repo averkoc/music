@@ -157,6 +157,18 @@
           ]
         }
       },
+      "metrical_emphasis": {
+        "_notes": [
+          "Automatic emphasis on strong beats from MusicXML time signature",
+          "Uses beatStrength property: 1.0 = downbeat, 0.5 = medium, 0.25 = weak",
+          "emphasis_amount adds CC11 expression scaled by beat strength",
+          "Example: 5 units means downbeats get +5 CC11, medium beats +2.5, weak beats +1.25"
+        ],
+        "enabled": true,
+        "emphasis_amount": 5,
+        "description": "Natural metrical accents on strong beats",
+        "notes": "Set to 0 or disable for completely flat phrasing. Typical range: 3-8"
+      },
       "portamento": {
         "_notes": [
           "Interval-aware portamento adds musical intelligence",

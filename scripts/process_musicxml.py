@@ -342,6 +342,15 @@ class MusicXMLToSWAM:
         # Base expression from dynamic level
         base_expression = note_art.dynamic_level.cc_value if note_art.dynamic_level else 80
         
+        # Apply metrical emphasis (configurable beat strength weighting)
+        metrical_config = self.instrument_config.get('metrical_emphasis', {})
+        if metrical_config.get('enabled', False):
+            emphasis_amount = metrical_config.get('emphasis_amount', 5)
+            # Scale emphasis based on beat strength: 1.0 (downbeat) gets full emphasis
+            # 0.5 (medium beat) gets half emphasis, 0.25 (weak beat) gets quarter
+            beat_emphasis = int(note_art.beat_strength * emphasis_amount)
+            base_expression = min(127, base_expression + beat_emphasis)
+        
         # Apply humanization to expression if enabled
         if self.humanizer and self.humanizer.should_add_expression_flutter():
             base_expression = self.humanizer.humanize_expression(base_expression)

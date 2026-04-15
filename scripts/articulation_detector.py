@@ -61,6 +61,7 @@ class NoteArticulation:
     dynamic_level: Optional[DynamicLevel]
     in_slur: bool
     expression_text: Optional[str]
+    beat_strength: float = 0.0  # Metrical weight: 1.0 = downbeat, 0.5 = medium, 0.25 = weak
 
 
 @dataclass
@@ -165,6 +166,9 @@ class MusicXMLArticulationDetector:
                 if expression_text and any(keyword in expression_text.lower() for keyword in ['vibrato', 'vib.', 'vib']):
                     articulations.append(ArticulationType.VIBRATO)
                 
+                # Get beat strength (0.0-1.0, where 1.0 = downbeat)
+                beat_strength = element.beatStrength if hasattr(element, 'beatStrength') else 0.0
+                
                 # Create note articulation
                 note_art = NoteArticulation(
                     note_index=note_index,
@@ -175,7 +179,8 @@ class MusicXMLArticulationDetector:
                     articulations=articulations,
                     dynamic_level=self.current_dynamic,
                     in_slur=in_slur,
-                    expression_text=expression_text
+                    expression_text=expression_text,
+                    beat_strength=beat_strength
                 )
                 
                 self.note_articulations.append(note_art)
