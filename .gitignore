@@ -54,3 +54,6 @@ desktop.ini
 
 # Personal configurations
 config/local_*.json
+
+# Web player HTML files (local development only)
+*.html
