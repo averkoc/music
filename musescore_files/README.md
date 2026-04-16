@@ -2,7 +2,7 @@
 
 Place your MuseScore Studio (.mscz) files in this directory.
 
-## 🎯 Comprehensive Test File (April 2026)
+## 🎯 Comprehensive Test File
 
 **📄 [violin_reference_test_complete.xml](violin_reference_test_complete.xml)**  
 **📖 [Complete Guide](violin_reference_test_complete_GUIDE.md)**  
@@ -18,17 +18,12 @@ This is the **official comprehensive test file** demonstrating ALL implemented S
 - ✅ Legato & slurs with CC64 and note overlap
 - ✅ Vibrato, glissando, dynamics, crescendo/diminuendo
 
+**Usage:**
 ```bash
 python scripts/process_musicxml.py musescore_files/violin_reference_test_complete.xml -i violin
 ```
 
 ---
-
-## 🎯 Legacy Reference Test File
-
-**Use `violin_reference_test.xml` as the canonical test file!**
-
-This comprehensive 14-measure file demonstrates ALL supported SWAM features with clear visual markers. See [violin_reference_test_GUIDE.md](violin_reference_test_GUIDE.md) for complete documentation.
 
 To process it:
 ```bash
