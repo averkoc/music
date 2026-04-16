@@ -25,6 +25,7 @@ class ArticulationType(Enum):
     CRESCENDO = "crescendo"
     DIMINUENDO = "diminuendo"
     VIBRATO = "vibrato"
+    TREMOLO = "tremolo"
     SUL_PONTICELLO = "sul-ponticello"
     SUL_TASTO = "sul-tasto"
     PORTAMENTO = "portamento"
@@ -195,6 +196,13 @@ class MusicXMLArticulationDetector:
         """Extract articulations from a music21 Note object."""
         articulations = []
         
+        # Check for tremolo ornaments first
+        if hasattr(note_obj, 'expressions'):
+            for expr in note_obj.expressions:
+                expr_name = expr.__class__.__name__.lower()
+                if 'tremolo' in expr_name:
+                    articulations.append(ArticulationType.TREMOLO)
+        
         for articulation in note_obj.articulations:
             art_name = articulation.__class__.__name__.lower()
             
@@ -225,7 +233,9 @@ class MusicXMLArticulationDetector:
                 articulations.append(ArticulationType.SPICCATO)
             elif 'detache' in art_name:
                 articulations.append(ArticulationType.DETACHE)
-            elif 'vibrato' in art_name or 'tremolo' in art_name:
+            elif 'tremolo' in art_name:
+                articulations.append(ArticulationType.TREMOLO)
+            elif 'vibrato' in art_name:
                 articulations.append(ArticulationType.VIBRATO)
         
         return articulations

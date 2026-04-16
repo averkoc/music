@@ -142,6 +142,38 @@ class MusicXMLToSWAM:
         if verbose:
             print("✓ Processing complete!")
     
+    def _expand_tremolo_notes(self, note_articulations: List[NoteArticulation]) -> List[NoteArticulation]:
+        """Expand tremolo notes into rapid repetitions."""
+        expanded_notes = []
+        
+        for note_art in note_articulations:
+            if ArticulationType.TREMOLO in note_art.articulations:
+                # Tremolo: subdivide into 32nd notes (8 notes per quarter note)
+                subdivisions = 8  # 32nd notes
+                subdivision_duration = note_art.duration / subdivisions
+                
+                # Create rapid repetitions
+                for i in range(subdivisions):
+                    # Create copy with shorter duration
+                    new_note = NoteArticulation(
+                        note_index=note_art.note_index,
+                        pitch=note_art.pitch,
+                        duration=subdivision_duration,
+                        onset_time=note_art.onset_time + (i * subdivision_duration),
+                        velocity=note_art.velocity,
+                        articulations=[art for art in note_art.articulations if art != ArticulationType.TREMOLO],  # Remove tremolo
+                        dynamic_level=note_art.dynamic_level,
+                        in_slur=False,  # Tremolo notes are separate
+                        expression_text=note_art.expression_text,
+                        beat_strength=note_art.beat_strength if i == 0 else 0.0  # Only first note keeps beat strength
+                    )
+                    expanded_notes.append(new_note)
+            else:
+                # Regular note - keep as is
+                expanded_notes.append(note_art)
+        
+        return expanded_notes
+    
     def _create_midi_from_articulations(
         self,
         note_articulations: List[NoteArticulation],
@@ -150,6 +182,9 @@ class MusicXMLToSWAM:
         verbose: bool
     ) -> mido.MidiFile:
         """Create MIDI file from extracted articulation data."""
+        
+        # Expand tremolo notes before processing
+        note_articulations = self._expand_tremolo_notes(note_articulations)
         
         midi_file = mido.MidiFile(ticks_per_beat=self.ticks_per_beat)
         track = mido.MidiTrack()
