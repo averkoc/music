@@ -217,6 +217,8 @@ python scripts/process_midi.py midi_input/your_file.mid --instrument violin
 | CC17 | Vibrato Rate | Vibrato speed/rate |
 | CC20 | Bow Force | Bow pressure on strings |
 | CC21 | Bow Position | Sul ponticello ↔ Sul tasto (strings) |
+| CC60 | Tremolo | Tremolo speed (0=off, strings) |
+| CC61 | Bow Mode | Arco/Pizzicato/Col Legno (strings) |
 | CC11 | Expression | Overall expression/volume |
 | CC18 | Growl | Harmonic distortion (saxophone) |
 | CC64 | Sustain | Sustain pedal (legato) |
@@ -250,12 +252,16 @@ All standard articulations are recognized from MusicXML and converted to appropr
 | **Staccatissimo** | ▼ | CC11 spike + 25% duration | Very short, detached notes |
 | **Accent** | > | CC11 peak at onset | Emphasized attack |
 | **Strong Accent** | ^ | Higher CC11 peak | Very strong emphasis |
-| **Marcato** | ^ | CC11 peak + firm attack | Strongly accented and separated |
+| **Marcato** | ^ | CC11 peak + CC20 spike envelope | Strongly accented and separated |
 | **Tenuto** | − | Full duration, sustained CC11 | Hold full value |
-| **Legato** | (text) | CC64 on, slight CC5 | Smooth connection |
-| **Slur** | ⌢ | CC64 on, CC5=40, note overlap | Connected with pitch slide |
-| **Spiccato** | (text) | CC11 spike + 40% duration | Bouncing bow (strings) |
-| **Detaché** | (text) | Separate bow, normal CC11 | Detached bow strokes (strings) |
+| **Legato** | (text) | CC64=127, high velocity, overlap | Smooth connection |
+| **Slur** | ⌢ | CC64=127, high velocity, 20% overlap | Connected with smooth legato |
+| **Spiccato** | (text) | CC11 spike + 40% duration + light bow | Bouncing bow (strings) |
+| **Detaché** | (text) | CC64=127, separated bow | Detached bow strokes with sustain (strings) |
+| **Pizzicato** | (text) | CC61=50 | Plucked strings (strings) |
+| **Col Legno** | (text) | CC61=90 | Struck with wood of bow (strings) |
+| **Flautato** | (text) | CC20=15 | Very light bow, airy/flute-like tone (strings) |
+| **Scratch** | (text) | CC20=125 | Maximum bow pressure, harsh tone (strings) |
 | **Sul Ponticello** | (text) | CC21=115 | Near bridge, bright tone (strings) |
 | **Sul Tasto** | (text) | CC21=15 | Over fingerboard, dark tone (strings) |
 
