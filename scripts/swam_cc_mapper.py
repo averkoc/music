@@ -34,8 +34,8 @@ class SWAMCCMapper:
     CC_EXPRESSION = 11
     CC_VIBRATO_RATE = 17  # CC17 for vibrato speed
     CC_GROWL = 18  # CC18 for saxophone growl
-    CC_TREMOLO = 19  # CC19 for tremolo (OFF=0, SLOW=64, FAST=127)
     CC_BOW_FORCE = 20  # CC20 for bow pressure on strings
+    CC_TREMOLO = 60  # CC60 for tremolo speed (0=off, higher values=faster, 127=very fast)
     CC_BOW_POSITION = 21  # CC21 for bow position (sul tasto to sul ponticello)
     CC_SUSTAIN = 64
     CC_LEGATO = 68  # CC68 for legato switch (some SWAM instruments)

@@ -457,11 +457,11 @@ class MusicXMLToSWAM:
             time=0
         ))
         
-        # Reset Tremolo (CC 19)
+        # Reset Tremolo (CC 60)
         track.append(mido.Message(
             'control_change',
             channel=0,
-            control=19,
+            control=60,
             value=0,  # Off
             time=0
         ))
@@ -749,11 +749,11 @@ class MusicXMLToSWAM:
                     
                     return messages
         
-        # Check for tremolo - use SWAM built-in tremolo via CC19
+        # Check for tremolo - use SWAM built-in tremolo via CC60
         if ArticulationType.TREMOLO in note_art.articulations:
-            # Activate SWAM tremolo (CC19)
-            # Values: 0=off, 64=slow bow tremolo, 127=fast bow tremolo
-            tremolo_speed = 127  # Fast tremolo for typical use
+            # Activate SWAM tremolo (CC60 continuous speed control)
+            # Values: 0=off, 50=slow, 80=medium, 127=very fast
+            tremolo_speed = 85  # Moderate tremolo speed
             
             messages.append(mido.Message(
                 'control_change',

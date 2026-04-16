@@ -57,11 +57,11 @@ This file contains clearly marked sections to help identify exactly where audio/
 ### MARKER 6: TREMOLO (Measure 6)
 - **Notes:** A5 repeated 4 times (in score)
 - **Direction:** **SAME PITCH** (sustained notes)
-- **Articulation:** Tremolo (bow shaking via SWAM built-in CC19)
+- **Articulation:** Tremolo (bow shaking via SWAM built-in CC60)
 - **Dynamic:** mp (soft)
 - **What to hear:** SWAM's built-in fast bow tremolo effect on sustained A5 notes
-- **MIDI Output:** 4 quarter notes with **CC19=127 (FAST tremolo)** active during each note
-- **Technical:** Uses SWAM CC19 controller: 0=OFF, 64=SLOW, 127=FAST
+- **MIDI Output:** 4 quarter notes with **CC60=127 (fast tremolo speed)** active during each note
+- **Technical:** Uses SWAM CC60 tremolo control: 0=OFF, low values=slow, high values=fast (continuous control)
 
 ---
 
