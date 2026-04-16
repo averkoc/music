@@ -2,7 +2,29 @@
 
 Place your MuseScore Studio (.mscz) files in this directory.
 
-## 🎯 Reference Test File
+## 🎯 Comprehensive Test File (April 2026)
+
+**📄 [violin_reference_test_complete.xml](violin_reference_test_complete.xml)**  
+**📖 [Complete Guide](violin_reference_test_complete_GUIDE.md)**  
+**🎵 [Test Output MIDI](../midi_output/test_complete_violin_swam.mid)**
+
+This is the **official comprehensive test file** demonstrating ALL implemented SWAM techniques with stateful tracking (24 measures):
+
+**Techniques Included:**
+- ✅ Bow modes: pizzicato (CC61=50), col legno (CC61=90)
+- ✅ Bow pressure: flautato (CC20=15), scratch (CC20=125), martelé
+- ✅ Bow position: sul ponticello (CC21=115), sul tasto (CC21=15)
+- ✅ Articulations: staccato, tenuto, accent, marcato, tremolo
+- ✅ Legato & slurs with CC64 and note overlap
+- ✅ Vibrato, glissando, dynamics, crescendo/diminuendo
+
+```bash
+python scripts/process_musicxml.py musescore_files/violin_reference_test_complete.xml -i violin
+```
+
+---
+
+## 🎯 Legacy Reference Test File
 
 **Use `violin_reference_test.xml` as the canonical test file!**
 
