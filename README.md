@@ -218,7 +218,7 @@ python scripts/process_midi.py midi_input/your_file.mid --instrument violin
 | CC20 | Bow Force | Bow pressure on strings |
 | CC21 | Bow Position | Sul ponticello ↔ Sul tasto (strings) |
 | CC60 | Tremolo | Tremolo speed (0=off, strings) |
-| CC61 | Bow Mode | Arco/Pizzicato/Col Legno (strings) |
+| CC61 | Bow Mode | Play mode: 0-9=Arco (5), ~50=Pizzicato (50), 80-127=Col Legno (90) |
 | CC11 | Expression | Overall expression/volume |
 | CC18 | Growl | Harmonic distortion (saxophone) |
 | CC64 | Sustain | Sustain pedal (legato) |
