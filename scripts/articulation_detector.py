@@ -22,6 +22,10 @@ class ArticulationType(Enum):
     SLUR = "slur"
     SPICCATO = "spiccato"
     DETACHE = "detache"
+    PIZZICATO = "pizzicato"
+    COL_LEGNO = "col-legno"
+    FLAUTATO = "flautato"
+    SCRATCH = "scratch"
     CRESCENDO = "crescendo"
     DIMINUENDO = "diminuendo"
     VIBRATO = "vibrato"
@@ -83,6 +87,7 @@ class MusicXMLArticulationDetector:
     def __init__(self):
         """Initialize the articulation detector."""
         self.current_dynamic: DynamicLevel = DynamicLevel.MF
+        self.current_technique: Optional[ArticulationType] = None  # Track technique (flautato, col legno, etc.)
         self.note_articulations: List[NoteArticulation] = []
         self.dynamic_changes: List[DynamicChange] = []
     
@@ -172,12 +177,41 @@ class MusicXMLArticulationDetector:
                 if dynamic:
                     self.current_dynamic = dynamic
                 
+                # Check for technique changes (flautato, col legno, scratch, arco, etc.)
+                technique_change = self._get_technique_at_element(element, part)
+                if technique_change == "CLEAR":
+                    self.current_technique = None  # Clear technique, return to normal arco
+                elif technique_change is not None:
+                    self.current_technique = technique_change
+                
+                # Apply current technique to this note
+                if self.current_technique:
+                    articulations.append(self.current_technique)
+                
                 # Get expression text
                 expression_text = self._extract_expression_text(element)
                 
                 # Check for vibrato in expression text
                 if expression_text and any(keyword in expression_text.lower() for keyword in ['vibrato', 'vib.', 'vib']):
                     articulations.append(ArticulationType.VIBRATO)
+                
+                # Check for bowing techniques in expression text
+                if expression_text:
+                    expr_lower = expression_text.lower()
+                    if any(keyword in expr_lower for keyword in ['détaché', 'detache', 'détach', 'detach']):
+                        articulations.append(ArticulationType.DETACHE)
+                    if any(keyword in expr_lower for keyword in ['spiccato', 'spicc.']):
+                        articulations.append(ArticulationType.SPICCATO)
+                    if any(keyword in expr_lower for keyword in ['sul pont', 'ponticello']):
+                        articulations.append(ArticulationType.SUL_PONTICELLO)
+                    if any(keyword in expr_lower for keyword in ['sul tasto', 'tasto']):
+                        articulations.append(ArticulationType.SUL_TASTO)
+                    if any(keyword in expr_lower for keyword in ['flautato', 'flaut.']):
+                        if ArticulationType.FLAUTATO not in articulations:  # Avoid duplicates
+                            articulations.append(ArticulationType.FLAUTATO)
+                    if any(keyword in expr_lower for keyword in ['scratch', 'scratchiness']):
+                        if ArticulationType.SCRATCH not in articulations:  # Avoid duplicates
+                            articulations.append(ArticulationType.SCRATCH)
                 
                 # Get beat strength (0.0-1.0, where 1.0 = downbeat)
                 beat_strength = element.beatStrength if hasattr(element, 'beatStrength') else 0.0
@@ -247,6 +281,10 @@ class MusicXMLArticulationDetector:
                 articulations.append(ArticulationType.DETACHE)
             elif 'tremolo' in art_name:
                 articulations.append(ArticulationType.TREMOLO)
+            elif 'pizzicato' in art_name or 'pizz' in art_name:
+                articulations.append(ArticulationType.PIZZICATO)
+            elif 'col legno' in art_name or 'collegno' in art_name or 'legno' in art_name:
+                articulations.append(ArticulationType.COL_LEGNO)
             elif 'vibrato' in art_name:
                 articulations.append(ArticulationType.VIBRATO)
         
@@ -274,6 +312,52 @@ class MusicXMLArticulationDetector:
                     return level
         
         return None
+    
+    def _get_technique_at_element(self, element, part) -> Optional[ArticulationType]:
+        """
+        Get technique marking (flautato, col legno, scratch, etc.) at a specific element offset.
+        Checks for measure-level text directions that indicate playing technique changes.
+        
+        Returns:
+            - ArticulationType if a technique is specified
+            - "CLEAR" string if technique should be cleared (return to normal arco)
+            - None if no change (keep current technique)
+        """
+        from music21 import expressions
+        
+        # Check for text expressions at this offset (within a small window)
+        text_at_offset = part.flatten().getElementsByOffset(
+            element.offset,
+            element.offset + 0.1,
+            includeEndBoundary=False,
+            classList=[expressions.TextExpression]
+        )
+        
+        for text_expr in text_at_offset:
+            text_content = ""
+            if hasattr(text_expr, 'content'):
+                text_content = text_expr.content.lower()
+            elif hasattr(text_expr, 'name'):
+                text_content = text_expr.name.lower()
+            else:
+                text_content = str(text_expr).lower()
+            
+            # Check for technique keywords
+            if 'flautato' in text_content or 'flaut.' in text_content:
+                return ArticulationType.FLAUTATO
+            elif 'col legno' in text_content or 'collegno' in text_content or 'legno' in text_content:
+                return ArticulationType.COL_LEGNO
+            elif 'scratch' in text_content or 'scratchiness' in text_content:
+                return ArticulationType.SCRATCH
+            elif 'sul pont' in text_content or 'ponticello' in text_content:
+                return ArticulationType.SUL_PONTICELLO
+            elif 'sul tasto' in text_content or 'tasto' in text_content:
+                return ArticulationType.SUL_TASTO
+            elif text_content in ['arco', 'normale', 'normal', 'ord.', 'ordinario']:
+                # Return to normal bowing - clear technique
+                return "CLEAR"
+        
+        return None  # Return None to indicate no change (keep current technique)
     
     def _extract_expression_text(self, note_obj) -> Optional[str]:
         """Extract expression text (like 'dolce', 'espressivo') from a note."""

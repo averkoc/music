@@ -76,6 +76,9 @@ class MusicXMLToSWAM:
         
         # Track previous pitch for Phase 1 interval-aware portamento
         self.prev_pitch = None
+        
+        # Track slur state for CC64 (sustain pedal) control
+        self.in_slur_region = False
     
     def process_file(
         self,
@@ -226,6 +229,33 @@ class MusicXMLToSWAM:
             # Recalculate delta time after processing note-offs, ensure non-negative
             delta_time = max(0, note_time_ticks - current_time)
             
+            # Handle sustain pedal (CC64) for slur regions (per SWAM manual)
+            # Slurred notes require sustain pedal ON for proper legato connection
+            if note_art.in_slur and not self.in_slur_region:
+                # Entering slur region - turn on sustain pedal
+                track.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_SUSTAIN,
+                    value=127,
+                    time=delta_time
+                ))
+                current_time += delta_time
+                delta_time = 0
+                self.in_slur_region = True
+            elif not note_art.in_slur and self.in_slur_region:
+                # Exiting slur region - turn off sustain pedal
+                track.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_SUSTAIN,
+                    value=0,
+                    time=delta_time
+                ))
+                current_time += delta_time
+                delta_time = 0
+                self.in_slur_region = False
+            
             # Add CC messages for this note based on articulation
             # Pass previous pitch for Phase 1 portamento
             cc_messages = self._generate_cc_for_note(note_art, delta_time, i, total_notes)
@@ -248,6 +278,16 @@ class MusicXMLToSWAM:
             velocity = note_art.velocity
             if self.humanizer:
                 velocity = self.humanizer.humanize_velocity(velocity)
+            
+            # SWAM Manual: For slurred legato, use HIGH velocity (90-127) on overlapped notes
+            # This triggers true legato instead of portamento
+            # Low velocity (10-50) triggers portamento, high velocity triggers legato
+            if note_art.in_slur and i > 0:
+                # Subsequent notes in slur need high velocity for legato
+                # First note of slur uses normal velocity, subsequent notes need high velocity
+                prev_note = note_articulations[i - 1]
+                if prev_note.in_slur:  # If previous note was also in slur
+                    velocity = max(90, velocity)  # Ensure high velocity for legato trigger
             
             # Add note on at time=0 (same tick as CCs, but after them in message order)
             track.append(mido.Message(
@@ -278,6 +318,15 @@ class MusicXMLToSWAM:
                     next_note_time = int(note_articulations[i + 1].onset_time * self.ticks_per_beat)
                     # Extend to overlap by 50% for more dramatic glissando slide
                     overlap_amount = int((next_note_time - note_time_ticks) * 0.5)
+                    duration_ticks = (next_note_time - note_time_ticks) + overlap_amount
+            elif note_art.in_slur and i + 1 < len(note_articulations):
+                # SWAM Manual: Slurred legato requires note overlap
+                # Overlap notes so second note starts before first ends
+                next_note = note_articulations[i + 1]
+                if next_note.in_slur:  # Only overlap if next note is also in slur
+                    next_note_time = int(next_note.onset_time * self.ticks_per_beat)
+                    # Moderate overlap for smooth legato connection
+                    overlap_amount = int((next_note_time - note_time_ticks) * 0.2)  # 20% overlap
                     duration_ticks = (next_note_time - note_time_ticks) + overlap_amount
             elif ArticulationType.STACCATO in note_art.articulations:
                 duration_ticks = int(duration_ticks * 0.35)  # 35% for integrated rhythmic flow
@@ -496,6 +545,345 @@ class MusicXMLToSWAM:
         # Apply humanization to expression if enabled
         if self.humanizer and self.humanizer.should_add_expression_flutter():
             base_expression = self.humanizer.humanize_expression(base_expression)
+        
+        # Check for pizzicato - set bow mode CC61
+        if ArticulationType.PIZZICATO in note_art.articulations:
+            # Reset bow force to default (in case we were in flautato/scratch)
+            if self.last_cc20_value != 64:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=64,  # Default bow force
+                    time=delta_time
+                ))
+                self.last_cc20_value = 64
+                delta_time = 0  # Subsequent messages have 0 delta
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_MODE,
+                value=50,  # Pizzicato mode (discovered threshold)
+                time=delta_time
+            ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            # Pizzicato notes are typically short and articulated
+            # Note duration will be handled in note-off timing
+            
+            self.last_cc11_value = base_expression
+            return messages
+        
+        # Check for col legno - set bow mode CC61
+        if ArticulationType.COL_LEGNO in note_art.articulations:
+            # Reset bow force to default (in case we were in flautato/scratch)
+            if self.last_cc20_value != 64:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=64,  # Default bow force
+                    time=delta_time
+                ))
+                self.last_cc20_value = 64
+                delta_time = 0  # Subsequent messages have 0 delta
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_MODE,
+                value=90,  # Col legno mode (discovered threshold)
+                time=delta_time
+            ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            # Col legno has distinctive wooden sound
+            # Note duration will be handled in note-off timing
+            
+            self.last_cc11_value = base_expression
+            return messages
+        
+        # Check for flautato - very light bow pressure (SWAM manual: CC20 = 0-20)
+        if ArticulationType.FLAUTATO in note_art.articulations:
+            # First reset bow mode to arco (in case we were in pizzicato/col legno)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_MODE,
+                value=5,  # Arco mode
+                time=delta_time
+            ))
+            delta_time = 0
+            
+            # Reset bow position to default (in case we were in sul pont/sul tasto)
+            if self.last_cc21_value != 64:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_POSITION,
+                    value=64,  # Default bow position
+                    time=0
+                ))
+                self.last_cc21_value = 64
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_FORCE,
+                value=15,  # Very light bow for airy, flute-like tone
+                time=0
+            ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            # Add coupled CC2
+            cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
+            self.last_cc11_value = base_expression
+            self.last_cc20_value = 15
+            return messages
+        
+        # Check for scratch - maximum bow pressure (SWAM manual: CC20 = 120-127)
+        if ArticulationType.SCRATCH in note_art.articulations:
+            # First reset bow mode to arco (in case we were in pizzicato/col legno)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_MODE,
+                value=5,  # Arco mode
+                time=delta_time
+            ))
+            delta_time = 0
+            
+            # Reset bow position to default (in case we were in sul pont/sul tasto)
+            if self.last_cc21_value != 64:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_POSITION,
+                    value=64,  # Default bow position
+                    time=0
+                ))
+                self.last_cc21_value = 64
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_FORCE,
+                value=125,  # Maximum bow pressure for harsh, scratchy tone
+                time=0
+            ))
+            
+            # Use high expression for scratchy effect
+            scratch_expression = min(127, base_expression + 10)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=scratch_expression,
+                time=0
+            ))
+            
+            # Add coupled CC2
+            cc2_value = self.cc_mapper._cc11_to_cc2(scratch_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
+            self.last_cc11_value = scratch_expression
+            self.last_cc20_value = 125
+            return messages
+        
+        # Check for sul ponticello - bow near bridge (CC21 = 115)
+        if ArticulationType.SUL_PONTICELLO in note_art.articulations:
+            # Reset bow force to default (in case we were in flautato/scratch)
+            if self.last_cc20_value != 64:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=64,  # Default bow force
+                    time=delta_time
+                ))
+                self.last_cc20_value = 64
+                delta_time = 0  # Subsequent messages have 0 delta
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_POSITION,
+                value=115,  # Near bridge for bright, intense tone
+                time=delta_time
+            ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            # Add coupled CC2
+            cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
+            self.last_cc11_value = base_expression
+            self.last_cc21_value = 115
+            return messages
+        
+        # Check for sul tasto - bow over fingerboard (CC21 = 15)
+        if ArticulationType.SUL_TASTO in note_art.articulations:
+            # Reset bow force to default (in case we were in flautato/scratch)
+            if self.last_cc20_value != 64:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=64,  # Default bow force
+                    time=delta_time
+                ))
+                self.last_cc20_value = 64
+                delta_time = 0  # Subsequent messages have 0 delta
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_POSITION,
+                value=15,  # Over fingerboard for soft, dark tone
+                time=delta_time
+            ))
+            
+            # Add base expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            # Add coupled CC2
+            cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
+            self.last_cc11_value = base_expression
+            self.last_cc21_value = 15
+            return messages
+        
+        # Check for spiccato - bouncing bow (short duration articulation)
+        # Note: SWAM manual says it requires BowLift = "Off String" (parameter not yet discovered)
+        # For now, use short duration + bright tone like staccato
+        if ArticulationType.SPICCATO in note_art.articulations:
+            # Spiccato spike similar to staccato but with bouncing character
+            spicc_messages = self.cc_mapper.apply_staccato(
+                base_cc11=base_expression,
+                spike_value=110,
+                sustain_after_spike=int(base_expression * 0.5)
+            )
+            
+            for time_offset, cc_msg in spicc_messages:
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=cc_msg.control,
+                    value=cc_msg.value,
+                    time=delta_time if not messages else time_offset
+                ))
+            
+            # Add harmonics for brightness
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_HARMONICS,
+                value=min(127, 64 + 12),
+                time=0
+            ))
+            
+            # Add bow controls for spiccato (violin only)
+            if self.instrument == SWAMInstrument.VIOLIN:
+                import random
+                # Light, quick bow for bouncing effect
+                spicc_force = int(55 + (base_expression - 20) * 0.2) + random.randint(-3, 3)
+                spicc_force = max(50, min(75, spicc_force))
+                
+                # Toward bridge for clarity
+                spicc_position = 72 + random.randint(-2, 2)
+                
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=spicc_force,
+                    time=0
+                ))
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_POSITION,
+                    value=spicc_position,
+                    time=0
+                ))
+                self.last_cc20_value = spicc_force
+                self.last_cc21_value = spicc_position
+            
+            # Update last CC11 value
+            self.last_cc11_value = base_expression
+            
+            return messages
+        
+        # Check for détaché - separated bow strokes with sustain pedal
+        # SWAM manual: Use CC64 (sustain) = 127, but notes are separated (no overlap)
+        # This is handled at the track level (sustain pedal state), not per-note
+        # Just process as normal note - sustain state is managed in main loop
         
         # Check for glissando - requires high portamento CC5
         if ArticulationType.GLISSANDO in note_art.articulations:
@@ -866,22 +1254,38 @@ class MusicXMLToSWAM:
             ))
             
             # Add bow controls for marcato (violin only)
+            # SWAM Manual: Martelé requires bow pressure spike then quick decay
             if self.instrument == SWAMInstrument.VIOLIN:
-                # Heavy bow force for marcato + variation
+                # Heavy bow force for marcato attack (SWAM manual: 83-102 range for scratchy attack)
                 import random
-                marcato_force = int(85 + (base_expression - 20) * 0.15) + random.randint(-4, 4)
-                marcato_force = max(80, min(105, marcato_force))
+                marcato_force_attack = int(88 + (base_expression - 20) * 0.12) + random.randint(-3, 3)
+                marcato_force_attack = max(83, min(102, marcato_force_attack))
+                
+                # Normal bow force for sustain (after attack)
+                marcato_force_sustain = 64 + random.randint(-2, 2)
                 
                 # Toward bridge for power + variation
                 marcato_position = 68 + random.randint(-3, 3)
                 
+                # Spike bow pressure for attack
                 messages.append(mido.Message(
                     'control_change',
                     channel=0,
                     control=SWAMCCMapper.CC_BOW_FORCE,
-                    value=marcato_force,
+                    value=marcato_force_attack,
                     time=0
                 ))
+                
+                # Quickly decrease bow pressure after attack (15 ticks = ~30ms at 480tpb, 120bpm)
+                messages.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_BOW_FORCE,
+                    value=marcato_force_sustain,
+                    time=15  # Quick decay to normal pressure
+                ))
+                
+                # Bow position
                 messages.append(mido.Message(
                     'control_change',
                     channel=0,
@@ -889,7 +1293,8 @@ class MusicXMLToSWAM:
                     value=marcato_position,
                     time=0
                 ))
-                self.last_cc20_value = marcato_force
+                
+                self.last_cc20_value = marcato_force_sustain  # Track sustain value, not attack
                 self.last_cc21_value = marcato_position
             
             # Update last CC11 value (marcato sustains at base)
@@ -975,7 +1380,8 @@ class MusicXMLToSWAM:
         # Note: For MusicXML workflow, we use a simplified envelope approach
         # that sets initial CC values before note-on, rather than scheduling
         # messages throughout the note duration.
-        if not has_special_articulation and len(note_art.articulations) == 0:
+        # Exclude slurred notes (handled by CC64 + high velocity for SWAM legato)
+        if not has_special_articulation and len(note_art.articulations) == 0 and not note_art.in_slur:
             # Add Phase 1 interval-aware portamento before the note
             portamento_config = self.instrument_config.get('portamento', {})
             if portamento_config.get('enabled', True) and self.prev_pitch is not None:
@@ -1379,6 +1785,16 @@ class MusicXMLToSWAM:
                 channel=0,
                 control=SWAMCCMapper.CC_BOW_POSITION,
                 value=64,  # Neutral bow position
+                time=0
+            ))
+        
+        # Bow Mode (strings only) - CC61: arco/pizzicato/col legno
+        if self.instrument == SWAMInstrument.VIOLIN:
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BOW_MODE,
+                value=5,  # Normal bowing (arco) - safely under threshold of 10
                 time=0
             ))
         
