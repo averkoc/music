@@ -47,6 +47,18 @@
           },
           "notes": "Continuous tremolo control: 0=off, higher values=faster tremolo. Variable speed for expressive control."
         },
+        "bow_mode": {
+          "cc": 61,
+          "description": "Bow mode selection (arco/pizzicato/col legno)",
+          "range": [0, 127],
+          "default": 5,
+          "values": {
+            "arco": 5,
+            "pizzicato": 50,
+            "col_legno": 90
+          },
+          "notes": "Discovered via Ableton envelope testing: 0-9=arco (normal bowing), ~50=pizzicato (plucked), 80-127=col legno (struck with wood)"
+        },
         "portamento_time": {
           "cc": 5,
           "description": "Slide time between notes",
