@@ -142,38 +142,6 @@ class MusicXMLToSWAM:
         if verbose:
             print("✓ Processing complete!")
     
-    def _expand_tremolo_notes(self, note_articulations: List[NoteArticulation]) -> List[NoteArticulation]:
-        """Expand tremolo notes into rapid repetitions."""
-        expanded_notes = []
-        
-        for note_art in note_articulations:
-            if ArticulationType.TREMOLO in note_art.articulations:
-                # Tremolo: subdivide into 32nd notes (8 notes per quarter note)
-                subdivisions = 8  # 32nd notes
-                subdivision_duration = note_art.duration / subdivisions
-                
-                # Create rapid repetitions
-                for i in range(subdivisions):
-                    # Create copy with shorter duration
-                    new_note = NoteArticulation(
-                        note_index=note_art.note_index,
-                        pitch=note_art.pitch,
-                        duration=subdivision_duration,
-                        onset_time=note_art.onset_time + (i * subdivision_duration),
-                        velocity=note_art.velocity,
-                        articulations=[art for art in note_art.articulations if art != ArticulationType.TREMOLO],  # Remove tremolo
-                        dynamic_level=note_art.dynamic_level,
-                        in_slur=False,  # Tremolo notes are separate
-                        expression_text=note_art.expression_text,
-                        beat_strength=note_art.beat_strength if i == 0 else 0.0  # Only first note keeps beat strength
-                    )
-                    expanded_notes.append(new_note)
-            else:
-                # Regular note - keep as is
-                expanded_notes.append(note_art)
-        
-        return expanded_notes
-    
     def _create_midi_from_articulations(
         self,
         note_articulations: List[NoteArticulation],
@@ -182,9 +150,6 @@ class MusicXMLToSWAM:
         verbose: bool
     ) -> mido.MidiFile:
         """Create MIDI file from extracted articulation data."""
-        
-        # Expand tremolo notes before processing
-        note_articulations = self._expand_tremolo_notes(note_articulations)
         
         midi_file = mido.MidiFile(ticks_per_beat=self.ticks_per_beat)
         track = mido.MidiTrack()
@@ -202,7 +167,7 @@ class MusicXMLToSWAM:
         
         # Process each note with articulation-specific CC messages
         current_time = 0
-        note_off_queue = []  # Track delayed note-offs: (time, note, has_gliss, note_off_velocity)
+        note_off_queue = []  # Track delayed note-offs: (time, note, has_gliss, note_off_velocity, has_tremolo)
         total_notes = len(note_articulations)
         tempo_bpm = mido.tempo2bpm(tempo)
         
@@ -224,7 +189,7 @@ class MusicXMLToSWAM:
             
             # Process any queued note-offs that should happen before this note
             while note_off_queue and note_off_queue[0][0] <= note_time_ticks:
-                off_time, off_note, off_has_gliss, off_velocity = note_off_queue.pop(0)
+                off_time, off_note, off_has_gliss, off_velocity, off_has_tremolo = note_off_queue.pop(0)
                 # Ensure note-off doesn't go backwards
                 off_time = max(current_time, off_time)
                 time_from_current = off_time - current_time
@@ -245,6 +210,16 @@ class MusicXMLToSWAM:
                         channel=0,
                         control=SWAMCCMapper.CC_PORTAMENTO,
                         value=0,
+                        time=0
+                    ))
+                
+                # Reset tremolo after tremolo note
+                if off_has_tremolo:
+                    track.append(mido.Message(
+                        'control_change',
+                        channel=0,
+                        control=SWAMCCMapper.CC_TREMOLO,  # CC19
+                        value=0,  # Off
                         time=0
                     ))
             
@@ -288,6 +263,7 @@ class MusicXMLToSWAM:
             duration_ticks = int(note_art.duration * self.ticks_per_beat)
             has_glissando = ArticulationType.GLISSANDO in note_art.articulations
             has_vibrato = ArticulationType.VIBRATO in note_art.articulations
+            has_tremolo = ArticulationType.TREMOLO in note_art.articulations
             
             # NOTE: Vibrato jitter during sustain disabled due to MIDI timing issues
             # The jitter messages were accumulating time offsets and disrupting rhythm
@@ -330,12 +306,12 @@ class MusicXMLToSWAM:
             elif has_glissando:
                 note_off_velocity = 10  # Seamless slide (bow stays on string)
             
-            # Queue the note off with velocity
+            # Queue the note off with velocity and tremolo status
             note_off_time = note_time_ticks + duration_ticks
-            note_off_queue.append((note_off_time, note_art.pitch, has_glissando, note_off_velocity))
+            note_off_queue.append((note_off_time, note_art.pitch, has_glissando, note_off_velocity, has_tremolo))
         
         # Process any remaining note-offs
-        for off_time, off_note, off_has_gliss, off_velocity in note_off_queue:
+        for off_time, off_note, off_has_gliss, off_velocity, off_has_tremolo in note_off_queue:
             # Ensure note-off doesn't go backwards
             off_time = max(current_time, off_time)
             time_from_current = off_time - current_time
@@ -353,6 +329,15 @@ class MusicXMLToSWAM:
                     channel=0,
                     control=SWAMCCMapper.CC_PORTAMENTO,
                     value=0,
+                    time=0
+                ))
+            
+            if off_has_tremolo:
+                track.append(mido.Message(
+                    'control_change',
+                    channel=0,
+                    control=SWAMCCMapper.CC_TREMOLO,  # CC19
+                    value=0,  # Off
                     time=0
                 ))
         
@@ -469,6 +454,15 @@ class MusicXMLToSWAM:
             channel=0,
             control=74,
             value=64,  # Neutral
+            time=0
+        ))
+        
+        # Reset Tremolo (CC 19)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=19,
+            value=0,  # Off
             time=0
         ))
         
@@ -673,6 +667,9 @@ class MusicXMLToSWAM:
                 if 'spiccato' in excluded_types:
                     excluded_enum.append(ArticulationType.SPICCATO)
                 
+                # Always exclude tremolo from default vibrato (tremolo has its own CC19)
+                excluded_enum.append(ArticulationType.TREMOLO)
+                
                 # Apply baseline vibrato if no excluded articulations present
                 if not any(art in note_art.articulations for art in excluded_enum):
                     # Get tempo for tick conversion
@@ -751,6 +748,44 @@ class MusicXMLToSWAM:
                     note_art._vibrato_targets = (cc1_clamped, cc17_target, default_vibrato_config)
                     
                     return messages
+        
+        # Check for tremolo - use SWAM built-in tremolo via CC19
+        if ArticulationType.TREMOLO in note_art.articulations:
+            # Activate SWAM tremolo (CC19)
+            # Values: 0=off, 64=slow bow tremolo, 127=fast bow tremolo
+            tremolo_speed = 127  # Fast tremolo for typical use
+            
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_TREMOLO,  # CC19
+                value=tremolo_speed,
+                time=delta_time
+            ))
+            
+            # Add expression
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_EXPRESSION,
+                value=base_expression,
+                time=0
+            ))
+            
+            # Add coupled CC2 (bow pressure)
+            cc2_value = self.cc_mapper._cc11_to_cc2(base_expression)
+            messages.append(mido.Message(
+                'control_change',
+                channel=0,
+                control=SWAMCCMapper.CC_BREATH,
+                value=cc2_value,
+                time=0
+            ))
+            
+            self.last_cc11_value = base_expression
+            
+            # Note: Tremolo will be turned off after the note in note-off handling
+            return messages
         
         # Check for staccato first - requires special CC spike pattern
         if ArticulationType.STACCATO in note_art.articulations:

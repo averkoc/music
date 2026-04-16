@@ -56,11 +56,12 @@ This file contains clearly marked sections to help identify exactly where audio/
 
 ### MARKER 6: TREMOLO (Measure 6)
 - **Notes:** A5 repeated 4 times (in score)
-- **Direction:** **SAME PITCH** (repeated rapidly)
-- **Articulation:** Tremolo (bow shaking/rapid repetition)
+- **Direction:** **SAME PITCH** (sustained notes)
+- **Articulation:** Tremolo (bow shaking via SWAM built-in CC19)
 - **Dynamic:** mp (soft)
-- **What to hear:** 32 rapid repeated notes on A5 (8 per quarter note = 32nd notes), like machine gun or bow tremolo
-- **MIDI Output:** 4 quarter notes expanded into **32 rapid notes** (60 ticks apart)
+- **What to hear:** SWAM's built-in fast bow tremolo effect on sustained A5 notes
+- **MIDI Output:** 4 quarter notes with **CC19=127 (FAST tremolo)** active during each note
+- **Technical:** Uses SWAM CC19 controller: 0=OFF, 64=SLOW, 127=FAST
 
 ---
 

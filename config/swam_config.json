@@ -34,6 +34,18 @@
           "default": 64,
           "notes": "Controls vibrato speed independently from depth"
         },
+        "tremolo": {
+          "cc": 19,
+          "description": "Bow tremolo effect",
+          "range": [0, 127],
+          "default": 0,
+          "values": {
+            "off": 0,
+            "slow": 64,
+            "fast": 127
+          },
+          "notes": "Built-in SWAM tremolo: 0=off, 64=slow bow tremolo, 127=fast bow tremolo"
+        },
         "portamento_time": {
           "cc": 5,
           "description": "Slide time between notes",
