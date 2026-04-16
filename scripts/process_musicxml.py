@@ -324,8 +324,121 @@ class MusicXMLToSWAM:
         # Add dynamic changes (crescendo/diminuendo)
         self._add_dynamic_changes(track, dynamic_changes)
         
+        # Add cleanup messages before end of track to prevent stuck notes and CC overshoot
+        # Calculate time to last event
+        last_event_time = 0
+        if track:
+            # Find the last note_off event
+            for msg in reversed(track):
+                if hasattr(msg, 'type') and msg.type == 'note_off':
+                    break
+                if hasattr(msg, 'time'):
+                    last_event_time += msg.time
+        
+        # Add cleanup messages shortly after last note (100 ticks = ~200ms at 480 tpb, 120 BPM)
+        cleanup_delay = 100
+        
+        # All Notes Off (CC 123)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=123,
+            value=0,
+            time=cleanup_delay
+        ))
+        
+        # All Sound Off (CC 120)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=120,
+            value=0,
+            time=0
+        ))
+        
+        # Reset Sustain/Legato (CC 64)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=64,
+            value=0,
+            time=0
+        ))
+        
+        # Reset Portamento (CC 5)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=5,
+            value=0,
+            time=0
+        ))
+        
+        # Reset Vibrato/Modulation (CC 1)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=1,
+            value=0,
+            time=0
+        ))
+        
+        # Reset Vibrato Rate (CC 17)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=17,
+            value=64,  # Neutral
+            time=0
+        ))
+        
+        # Reset Expression to neutral level (CC 11) - prevents overshoot
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=11,
+            value=64,  # Neutral level
+            time=0
+        ))
+        
+        # Reset Breath/Bow Pressure (CC 2)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=2,
+            value=64,  # Neutral
+            time=0
+        ))
+        
+        # Reset Bow Force (CC 20) - violin only
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=20,
+            value=64,  # Neutral
+            time=0
+        ))
+        
+        # Reset Bow Position (CC 21) - violin only
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=21,
+            value=64,  # Neutral
+            time=0
+        ))
+        
+        # Reset Harmonics/Brightness (CC 74)
+        track.append(mido.Message(
+            'control_change',
+            channel=0,
+            control=74,
+            value=64,  # Neutral
+            time=0
+        ))
+        
         # Add end of track
-        track.append(mido.MetaMessage('end_of_track', time=0))
+        track.append(mido.MetaMessage('end_of_track', time=100))  # Small delay after cleanup
         
         return midi_file
     
@@ -461,32 +574,22 @@ class MusicXMLToSWAM:
             delay_ticks = int((delay_ms / ms_per_beat) * ticks_per_beat)
             ramp_ticks = int((ramp_ms / ms_per_beat) * ticks_per_beat)
             
-            # Set initial vibrato state (no delay/ramp before note-on to preserve rhythm)
-            # CC1 starts at 0, CC17 at target rate
-            # Vibrato will be developed later if we re-implement sustain modulation
-            messages.append(mido.Message(
-                'control_change',
-                channel=0,
-                control=SWAMCCMapper.CC_MODULATION,  # CC1
-                value=0,
-                time=delta_time
-            ))
+            # Set vibrato state (immediate, no delay/ramp before note-on to preserve rhythm)
+            # Ensure cc1_target does not exceed SWAM maximum of 110
+            cc1_clamped = min(110, cc1_target)
             
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
                 control=17,  # CC17 - Vibrato Rate
                 value=cc17_target,
-                time=0
+                time=delta_time
             ))
             
-            # Simple immediate vibrato (no delay/ramp for timing reasons)
-            # Ensure cc1_target does not exceed SWAM maximum of 110
-            cc1_clamped = min(110, cc1_target)
             messages.append(mido.Message(
                 'control_change',
                 channel=0,
-                control=SWAMCCMapper.CC_MODULATION,
+                control=SWAMCCMapper.CC_MODULATION,  # CC1 - Vibrato Depth
                 value=cc1_clamped,
                 time=0
             ))
