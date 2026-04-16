@@ -109,8 +109,7 @@ class MusicXMLArticulationDetector:
         note_index = 0
         current_offset = 0.0
         
-        # Track slur state
-        in_slur = False
+        # Track slur state (no longer manual tracking - using spanners below)
         slur_start_dynamic = self.current_dynamic
         
         # Collect glissando spanners
@@ -126,9 +125,24 @@ class MusicXMLArticulationDetector:
             # Check for wavy line, trill, or vibrato spanners
             if any(keyword in spanner_name for keyword in ['wavyline', 'trill', 'tremolo']):
                 if spanner.getFirst() and spanner.getLast():
-                    start_offset = spanner.getFirst().offset
-                    end_offset = spanner.getLast().offset
+                    # Get absolute offsets (from start of piece, not measure)
+                    first_note = spanner.getFirst()
+                    last_note = spanner.getLast()
+                    start_offset = first_note.getOffsetInHierarchy(part)
+                    end_offset = last_note.getOffsetInHierarchy(part) + last_note.duration.quarterLength
                     vibrato_ranges.append((start_offset, end_offset))
+        
+        # Collect slur spanners        
+        slur_ranges = []  # List of (start_offset, end_offset) tuples
+        for spanner in part.flatten().spanners:
+            if spanner.__class__.__name__ == 'Slur':
+                if spanner.getFirst() and spanner.getLast():
+                    # Get absolute offsets (from start of piece, not measure)
+                    first_note = spanner.getFirst()
+                    last_note = spanner.getLast()
+                    start_offset = first_note.getOffsetInHierarchy(part)
+                    end_offset = last_note.getOffsetInHierarchy(part) + last_note.duration.quarterLength
+                    slur_ranges.append((start_offset, end_offset))
         
         # Iterate through all notes and dynamics
         for element in part.flatten().notesAndRests:
@@ -142,23 +156,21 @@ class MusicXMLArticulationDetector:
                 
                 # Check if note is within vibrato spanner range
                 for start, end in vibrato_ranges:
-                    if start <= element.offset <= end:
+                    if start <= element.offset < end:
                         articulations.append(ArticulationType.VIBRATO)
+                        break
+                
+                # Check if note is within slur range
+                in_slur = False
+                for start, end in slur_ranges:
+                    if start <= element.offset < end:
+                        in_slur = True
                         break
                 
                 # Check for dynamic markings on this note
                 dynamic = self._get_dynamic_at_element(element, part)
                 if dynamic:
                     self.current_dynamic = dynamic
-                
-                # Check for slurs
-                if element.tie is None or element.tie.type != 'stop':
-                    # Check expressions for slurs
-                    for exp in element.expressions:
-                        if 'Slur' in exp.classes or hasattr(exp, 'placement'):
-                            if not in_slur:
-                                in_slur = True
-                                slur_start_dynamic = self.current_dynamic
                 
                 # Get expression text
                 expression_text = self._extract_expression_text(element)

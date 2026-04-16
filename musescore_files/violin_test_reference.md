@@ -1,3 +1,21 @@
+# ⚠️ DEPRECATED - Use violin_reference_test.xml Instead
+
+**This documentation is outdated. Please use the new canonical test file:**
+
+📄 **File:** `violin_reference_test.xml`  
+📖 **Guide:** [violin_reference_test_GUIDE.md](violin_reference_test_GUIDE.md)
+
+The new reference file includes:
+- ✅ All features from this file
+- ✅ Visual markers for easy following
+- ✅ Additional articulations (tremolo, pizzicato)
+- ✅ Better organization (14 measures)
+- ✅ Comprehensive documentation
+
+---
+
+# OLD DOCUMENTATION BELOW (Archived)
+
 # Violin.xml - Feature Demonstration Reference
 
 A 12-bar test file showcasing all supported SWAM articulations, dynamics, and techniques.
@@ -78,11 +96,13 @@ A 12-bar test file showcasing all supported SWAM articulations, dynamics, and te
 
 ### Process with MusicXML Script:
 ```bash
-python scripts/process_musicxml.py musescore_files/violin.xml
+# DEPRECATED - Use violin_reference_test.xml instead
+python scripts/process_musicxml.py musescore_files/violin_reference_test.xml
 ```
 
 ### Output Location:
-```
+# DEPRECATED - New file outputs to:
+midi_output/violin_reference_test
 midi_output/violin_violin_swam.mid
 ```
 

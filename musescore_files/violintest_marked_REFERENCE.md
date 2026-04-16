@@ -1,3 +1,16 @@
+# ⚠️ DEPRECATED - Use violin_reference_test.xml Instead
+
+**This file has been replaced by the new canonical test file:**
+
+📄 **File:** `violin_reference_test.xml`  
+📖 **Guide:** [violin_reference_test_GUIDE.md](violin_reference_test_GUIDE.md)
+
+The new file includes everything from this marked version PLUS more articulations.
+
+---
+
+# OLD DOCUMENTATION BELOW (Archived)
+
 # Violin Test File - MARKED VERSION - Reference Guide
 
 **File:** `violintest_marked.xml`  

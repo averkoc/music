@@ -2,6 +2,19 @@
 
 Place your MuseScore Studio (.mscz) files in this directory.
 
+## 🎯 Reference Test File
+
+**Use `violin_reference_test.xml` as the canonical test file!**
+
+This comprehensive 14-measure file demonstrates ALL supported SWAM features with clear visual markers. See [violin_reference_test_GUIDE.md](violin_reference_test_GUIDE.md) for complete documentation.
+
+To process it:
+```bash
+python scripts/process_musicxml.py musescore_files/violin_reference_test.xml
+```
+
+---
+
 ## Recommended Workflow
 
 **Export as MusicXML for best results!**

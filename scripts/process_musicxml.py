@@ -508,15 +508,6 @@ class MusicXMLToSWAM:
                 time=delta_time
             ))
             
-            # Enable legato for smooth slide
-            messages.append(mido.Message(
-                'control_change',
-                channel=0,
-                control=SWAMCCMapper.CC_SUSTAIN,
-                value=127,
-                time=0
-            ))
-            
             # Add base expression
             messages.append(mido.Message(
                 'control_change',
@@ -1237,25 +1228,6 @@ class MusicXMLToSWAM:
                 time=0
             ))
             self.last_cc21_value = bow_position
-        
-        # Add legato (sustain) for slurred notes
-        if note_art.in_slur:
-            messages.append(mido.Message(
-                'control_change',
-                channel=0,
-                control=SWAMCCMapper.CC_SUSTAIN,
-                value=127,
-                time=0
-            ))
-        else:
-            # Release sustain if not in slur
-            messages.append(mido.Message(
-                'control_change',
-                channel=0,
-                control=SWAMCCMapper.CC_SUSTAIN,
-                value=0,
-                time=0
-            ))
         
         # Add breath for saxophone
         if self.instrument == SWAMInstrument.SAXOPHONE:
